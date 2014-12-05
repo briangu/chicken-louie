@@ -1,5 +1,3 @@
-;csc -lev libev/libev.scm && ./libev/libev
-
 (import foreign)
 (foreign-declare "#include <ev.h>")
 (foreign-declare "#include <stdio.h>")
@@ -77,10 +75,12 @@
 (let ((z 32))
     (ev-new-timer l 
         (lambda () 
-          (set! z (+ z 1)) 
-          (display z)(newline))
-        1.0 1.0))
+          (display z)(newline)
+          (set! z (+ z 1)))
+        0 1.0))
 
 (ev-run l 0)
+(display "Done")(newline)
 (ev-loop-destroy l)
+(display "Destroyed")(newline)
 
