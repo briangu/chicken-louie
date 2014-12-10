@@ -60,12 +60,40 @@
 
 (define ev-timer-init (foreign-lambda void "ev_timer_init" *ev-timer (function void (ev-loop *ev-timer int)) ev-tstamp ev-tstamp))
 (define ev-timer-start (foreign-lambda void "ev_timer_start" ev-loop *ev-timer))
-
-(define ev-new-timer 
-  (foreign-lambda void "new_timer" ev-loop scheme-object ev-tstamp ev-tstamp))
+(define ev-timer-stop (foreign-lambda void "ev_timer_stop" ev-loop *ev-timer))
 
 ; main
 (define l (ev-default-loop 0))
+
+(define mk-ev-timer 
+	(foreign-lambda* *ev-timer ()
+		"C_return(malloc(sizeof(ev_timer)));"))
+
+(define timeout_watcher (mk-ev-timer))
+
+(define k 0)
+
+(define (hello n)
+	(print "Hello, world!")
+   	(print "what's up?")
+   	(print k)
+   	(set! k (+ k 1))
+   	(if (> k 3)
+   		(begin 
+   			(print "stopping timer")
+   		 	(ev-timer-stop l timeout_watcher))))
+
+(define-external (hello_cb (ev-loop l) 
+		 	  		 (*ev-timer timer)
+		 	  		 (int n)) 
+	void 
+	(hello n))
+
+(define ev-new-timer 
+  (foreign-lambda *ev-timer "new_timer" ev-loop scheme-object ev-tstamp ev-tstamp))
+
+(ev-timer-init timeout_watcher #$hello_cb 0 1)
+(ev-timer-start l timeout_watcher)
 
 (display "Default: ")(display (ev-is-default-loop l))(newline)
 (display "Iteration: ")(display (ev-iteration l))(newline)
@@ -73,7 +101,7 @@
 (display "Backend: ")(display (ev-backend l))(newline)
 
 (let ((z 32))
-    (ev-new-timer l 
+	 (ev-new-timer l 
         (lambda () 
           (display z)(newline)
           (set! z (+ z 1)))
@@ -83,4 +111,3 @@
 (display "Done")(newline)
 (ev-loop-destroy l)
 (display "Destroyed")(newline)
-

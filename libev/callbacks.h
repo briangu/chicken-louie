@@ -12,6 +12,6 @@ typedef struct cs_ev_timer {
 } cs_ev_timer;
 
 void cs_timer_cb(EV_P_ ev_timer *w, int revents);
-void new_timer(EV_P_ C_word closure, ev_tstamp delay, ev_tstamp redelay);
+ev_timer *new_timer(EV_P_ C_word closure, ev_tstamp delay, ev_tstamp redelay);
 
 #endif
