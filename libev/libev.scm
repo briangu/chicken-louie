@@ -73,39 +73,42 @@
 
 (define k 0)
 
-(define (hello n)
-	(print "Hello, world!")
-   	(print "what's up?")
-   	(print k)
+(define-external (hello_cb (ev-loop l) 
+		 	  		 (*ev-timer timer)
+		 	  		 (int n)) 
+	void 
+	(print "Hello, world! what's up?")
    	(set! k (+ k 1))
+   	(print k)
    	(if (> k 3)
    		(begin 
    			(print "stopping timer")
    		 	(ev-timer-stop l timeout_watcher))))
 
-(define-external (hello_cb (ev-loop l) 
-		 	  		 (*ev-timer timer)
-		 	  		 (int n)) 
-	void 
-	(hello n))
-
-(define ev-new-timer 
-  (foreign-lambda *ev-timer "new_timer" ev-loop scheme-object ev-tstamp ev-tstamp))
-
 (ev-timer-init timeout_watcher #$hello_cb 0 1)
 (ev-timer-start l timeout_watcher)
+
+(define cs-new-timer 
+  (foreign-lambda *ev-timer "cs_new_timer" ev-loop ev-tstamp ev-tstamp))
+(define cs-start-timer 
+  (foreign-lambda void"cs_start_timer" ev-loop *ev-timer scheme-object))
 
 (display "Default: ")(display (ev-is-default-loop l))(newline)
 (display "Iteration: ")(display (ev-iteration l))(newline)
 (display "Depth: ")(display (ev-depth l))(newline)
 (display "Backend: ")(display (ev-backend l))(newline)
 
-(let ((z 32))
-	 (ev-new-timer l 
-        (lambda () 
-          (display z)(newline)
-          (set! z (+ z 1)))
-        0 1.0))
+(let* ((z 32)
+	   (zt (cs-new-timer l 0 1.0))
+	   (zl (lambda () 
+          		(display z)(newline)
+				(set! z (+ z 1))
+				(if (> k 3)
+					(begin 
+						(print "stopping timer: zt")
+				 		(ev-timer-stop l zt))))))
+	(cs-start-timer l zt zl)
+)
 
 (ev-run l 0)
 (display "Done")(newline)
