@@ -109,7 +109,7 @@
 	   (zl (lambda () ; create a lambda which has the timer in the closure
 				(display z)(newline)
 				(set! z (+ z 1))
-				(if (> z 3) ; stop the timer if above 3
+				(if (> z 40) ; stop the timer if above 3
 					(begin 
 						(print "stopping timer: zt")
 				 		(cs-stop-and-free-timer l zt))))))
