@@ -38,3 +38,9 @@ void cs_stop_and_free_timer(EV_P_ ev_timer *w) {
 	cs_stop_timer(loop, w);
 	cs_free_timer(w);
 }
+
+ev_timer *cs_start_new_timer_with_callback(EV_P_ C_word closure, ev_tstamp delay, ev_tstamp redelay) {
+    cs_ev_timer *cet = (struct cs_ev_timer*)cs_new_timer(loop, delay, redelay);
+    cs_start_timer(loop, (ev_timer *)cet, closure);
+    return (ev_timer *)cet;
+}
