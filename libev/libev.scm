@@ -64,7 +64,9 @@
 
 (define cs-new-timer (foreign-lambda *ev-timer "cs_new_timer" ev-loop ev-tstamp ev-tstamp))
 (define cs-start-timer (foreign-lambda void"cs_start_timer" ev-loop *ev-timer scheme-object))
-
+(define cs-stop-timer (foreign-lambda void"cs_stop_timer" ev-loop *ev-timer))
+(define cs-stop-and-free-timer (foreign-lambda void"cs_stop_and_free_timer" ev-loop *ev-timer))
+(define cs-free-timer (foreign-lambda void"cs_free_timer" *ev-timer))
 
 ; main
 
@@ -110,7 +112,7 @@
 				(if (> k 3) ; stop the timer if above 3
 					(begin 
 						(print "stopping timer: zt")
-				 		(ev-timer-stop l zt))))))
+				 		(cs-stop-and-free-timer l zt))))))
 	(cs-start-timer l zt zl) ; start the timer
 )
 
