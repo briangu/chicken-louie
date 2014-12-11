@@ -107,9 +107,9 @@
 (let* ((z 32)
 	   (zt (cs-new-timer l 0 1.0)) ; allocate the timer
 	   (zl (lambda () ; create a lambda which has the timer in the closure
-          		(display z)(newline)
+				(display z)(newline)
 				(set! z (+ z 1))
-				(if (> k 3) ; stop the timer if above 3
+				(if (> z 3) ; stop the timer if above 3
 					(begin 
 						(print "stopping timer: zt")
 				 		(cs-stop-and-free-timer l zt))))))
