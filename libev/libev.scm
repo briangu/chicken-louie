@@ -62,9 +62,21 @@
 (define ev-timer-start (foreign-lambda void "ev_timer_start" ev-loop *ev-timer))
 (define ev-timer-stop (foreign-lambda void "ev_timer_stop" ev-loop *ev-timer))
 
+(define cs-new-timer (foreign-lambda *ev-timer "cs_new_timer" ev-loop ev-tstamp ev-tstamp))
+(define cs-start-timer (foreign-lambda void"cs_start_timer" ev-loop *ev-timer scheme-object))
+
+
 ; main
+
+; create the event loop
 (define l (ev-default-loop 0))
 
+(display "Default: ")(display (ev-is-default-loop l))(newline)
+(display "Iteration: ")(display (ev-iteration l))(newline)
+(display "Depth: ")(display (ev-depth l))(newline)
+(display "Backend: ")(display (ev-backend l))(newline)
+
+; show how to use an externally allocated timer 
 (define mk-ev-timer 
 	(foreign-lambda* *ev-timer ()
 		"C_return(malloc(sizeof(ev_timer)));"))
@@ -88,27 +100,21 @@
 (ev-timer-init timeout_watcher #$hello_cb 0 1)
 (ev-timer-start l timeout_watcher)
 
-(define cs-new-timer 
-  (foreign-lambda *ev-timer "cs_new_timer" ev-loop ev-tstamp ev-tstamp))
-(define cs-start-timer 
-  (foreign-lambda void"cs_start_timer" ev-loop *ev-timer scheme-object))
-
-(display "Default: ")(display (ev-is-default-loop l))(newline)
-(display "Iteration: ")(display (ev-iteration l))(newline)
-(display "Depth: ")(display (ev-depth l))(newline)
-(display "Backend: ")(display (ev-backend l))(newline)
+; show how to create a timer that calls a lambda
 
 (let* ((z 32)
-	   (zt (cs-new-timer l 0 1.0))
-	   (zl (lambda () 
+	   (zt (cs-new-timer l 0 1.0)) ; allocate the timer
+	   (zl (lambda () ; create a lambda which has the timer in the closure
           		(display z)(newline)
 				(set! z (+ z 1))
-				(if (> k 3)
+				(if (> k 3) ; stop the timer if above 3
 					(begin 
 						(print "stopping timer: zt")
 				 		(ev-timer-stop l zt))))))
-	(cs-start-timer l zt zl)
+	(cs-start-timer l zt zl) ; start the timer
 )
+
+; start the loop
 
 (ev-run l 0)
 (display "Done")(newline)
