@@ -64,7 +64,7 @@
 
 (define cs-new-timer (foreign-lambda *ev-timer "cs_new_timer" ev-loop ev-tstamp ev-tstamp))
 (define cs-start-timer (foreign-lambda void"cs_start_timer" ev-loop *ev-timer scheme-object))
-(define cs-start-new-timer (foreign-lambda void"cs_start_new_timer_with_callback" ev-loop scheme-object ev-tstamp ev-tstamp))
+(define cs-start-new-timer (foreign-lambda void"cs_start_new_timer_with_callback" ev-loop ev-tstamp ev-tstamp scheme-object))
 (define cs-stop-timer (foreign-lambda void"cs_stop_timer" ev-loop *ev-timer))
 (define cs-stop-and-free-timer (foreign-lambda void"cs_stop_and_free_timer" ev-loop *ev-timer))
 (define cs-free-timer (foreign-lambda void"cs_free_timer" *ev-timer))
@@ -106,12 +106,10 @@
 ; show how to create a simple timer
 
 (let ((z 60))
-	(cs-start-new-timer l 
+	(cs-start-new-timer l 0 1.0
 		(lambda ()
 			(display z)(newline)
-			(set! z (+ z 1)))
-		0 1.0)
-)
+			(set! z (+ z 1)))))
 
 ; show how to create a timer that calls a lambda
 
@@ -124,8 +122,7 @@
 					(begin 
 						(print "stopping timer: zt")
 				 		(cs-stop-and-free-timer l zt))))))
-	(cs-start-timer l zt zl) ; start the timer
-)
+	(cs-start-timer l zt zl)) ; start the timer
 
 ; start the loop
 
