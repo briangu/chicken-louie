@@ -5,34 +5,34 @@
 (foreign-declare "#include <stdio.h>")
 (foreign-declare "#include \"callbacks.h\"")
 
-(define-foreign-variable EVFLAG-AUTO "EVFLAG_AUTO")
-(define-foreign-variable EVFLAG-NO_ENV "EVFLAG_NO_ENV")
-(define-foreign-variable EVFLAG-FORKCHECK "EVFLAG_FORKCHECK")
-(define-foreign-variable EVFLAG-NOINOTIFY "EVFLAG_NOINOTIFY")
-(define-foreign-variable EVFLAG-SIGNALFD "EVFLAG_SIGNALFD")
-(define-foreign-variable EVFLAG-NOSIGMASK "EVFLAG_NOSIGMASK")
+(define-foreign-variable EVFLAG-AUTO int "EVFLAG_AUTO")
+(define-foreign-variable EVFLAG-NO_ENV int "EVFLAG_NO_ENV")
+(define-foreign-variable EVFLAG-FORKCHECK int "EVFLAG_FORKCHECK")
+(define-foreign-variable EVFLAG-NOINOTIFY int "EVFLAG_NOINOTIFY")
+(define-foreign-variable EVFLAG-SIGNALFD int "EVFLAG_SIGNALFD")
+(define-foreign-variable EVFLAG-NOSIGMASK int "EVFLAG_NOSIGMASK")
 
-(define-foreign-variable EVBACKEND-SELECT "EVBACKEND_SELECT")
-(define-foreign-variable EVBACKEND-POLL "EVBACKEND_POLL")
-(define-foreign-variable EVBACKEND-EPOLL "EVBACKEND_EPOLL")
-(define-foreign-variable EVBACKEND-KQUEUE "EVBACKEND_KQUEUE")
-(define-foreign-variable EVBACKEND-DEVPOLL "EVBACKEND_DEVPOLL")
-(define-foreign-variable EVBACKEND-PORT "EVBACKEND_PORT")
-(define-foreign-variable EVBACKEND-ALL "EVBACKEND_ALL")
-(define-foreign-variable EVBACKEND-MASK "EVBACKEND_MASK")
+(define-foreign-variable EVBACKEND-SELECT int "EVBACKEND_SELECT")
+(define-foreign-variable EVBACKEND-POLL int "EVBACKEND_POLL")
+(define-foreign-variable EVBACKEND-EPOLL int "EVBACKEND_EPOLL")
+(define-foreign-variable EVBACKEND-KQUEUE int "EVBACKEND_KQUEUE")
+(define-foreign-variable EVBACKEND-DEVPOLL int "EVBACKEND_DEVPOLL")
+(define-foreign-variable EVBACKEND-PORT int "EVBACKEND_PORT")
+(define-foreign-variable EVBACKEND-ALL int "EVBACKEND_ALL")
+(define-foreign-variable EVBACKEND-MASK int "EVBACKEND_MASK")
 
-(define-foreign-variable EVBREAK-CANCEL "EVBREAK_CANCEL")
-(define-foreign-variable EVBREAK-ONE "EVBREAK_ONE")
-(define-foreign-variable EVBREAK-ALL "EVBREAK_ALL")
-
-(define-foreign-variable EV_STDIN "STDIN_FILENO")
-(define-foreign-variable EV_STDOUT "STDOUT_FILENO")
-
-(define-foreign-variable EV_READ "EV_READ")
-(define-foreign-variable EV_WRITE "EV_WRITE")
+(define-foreign-variable EVBREAK-CANCEL int "EVBREAK_CANCEL")
+(define-foreign-variable EVBREAK-ONE int "EVBREAK_ONE")
+(define-foreign-variable EVBREAK-ALL int "EVBREAK_ALL")
 
 (define-foreign-type ev-fd int) ; io fd
+(define-foreign-variable EV_STDIN ev-fd "STDIN_FILENO")
+(define-foreign-variable EV_STDOUT ev-fd "STDOUT_FILENO")
+
 (define-foreign-type ev-events int) ; io events
+(define-foreign-variable EV_READ ev-events "EV_READ")
+(define-foreign-variable EV_WRITE ev-events "EV_WRITE")
+
 (define-foreign-type ev-tstamp double) ; ev_tstamp
 (define-foreign-type ev-loop (c-pointer "struct ev_loop"))
 
@@ -138,23 +138,20 @@
 
 ; io - stdin
 
-(print EV_STDIN)
-
 (define mk-ev-io 
 	(foreign-lambda* *ev-io ()
 		"C_return(malloc(sizeof(ev_io)));"))
 (define stdin_watcher (mk-ev-io))
 
-(define-external (stdin_cb (ev-loop l) 
+(define-external (stdin_cb (ev-loop l)
 		 	  		 (*ev-io fd)
-		 	  		 (int n)) 
-	void 
+		 	  		 (int n))
+	void
 	(display "got some data: ")
 	(print (read-line)))
 
-(ev-io-init stdin_watcher #$stdin_cb 0 1)
+(ev-io-init stdin_watcher #$stdin_cb 0 EV_READ)
 (ev-io-start l stdin_watcher)
-
 
 ; start the loop
 
