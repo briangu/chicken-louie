@@ -136,7 +136,9 @@
 				 		(cs-stop-and-free-timer l zt))))))
 	(cs-start-timer l zt zl)) ; start the timer
 
-; io
+; io - stdin
+
+(print EV_STDIN)
 
 (define mk-ev-io 
 	(foreign-lambda* *ev-io ()
