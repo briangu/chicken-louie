@@ -32,6 +32,7 @@
 (define-foreign-type ev-events int) ; io events
 (define-foreign-variable EV_READ ev-events "EV_READ")
 (define-foreign-variable EV_WRITE ev-events "EV_WRITE")
+(define-foreign-variable EV_ERROR ev-events "EV_ERROR")
 
 (define-foreign-type ev-tstamp double) ; ev_tstamp
 (define-foreign-type ev-loop (c-pointer "struct ev_loop"))
@@ -138,7 +139,7 @@
 
 ; io - stdin
 
-(define mk-ev-io 
+(define mk-ev-io
 	(foreign-lambda* *ev-io ()
 		"C_return(malloc(sizeof(ev_io)));"))
 (define stdin_watcher (mk-ev-io))
