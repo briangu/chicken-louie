@@ -1,3 +1,5 @@
+(use extras)
+
 (import foreign)
 (foreign-declare "#include <ev.h>")
 (foreign-declare "#include <stdio.h>")
@@ -23,14 +25,22 @@
 (define-foreign-variable EVBREAK-ONE "EVBREAK_ONE")
 (define-foreign-variable EVBREAK-ALL "EVBREAK_ALL")
 
+(define-foreign-variable EV_STDIN "STDIN_FILENO")
+(define-foreign-variable EV_STDOUT "STDOUT_FILENO")
+
+(define-foreign-variable EV_READ "EV_READ")
+(define-foreign-variable EV_WRITE "EV_WRITE")
+
+(define-foreign-type ev-fd int) ; io fd
+(define-foreign-type ev-events int) ; io events
 (define-foreign-type ev-tstamp double) ; ev_tstamp
 (define-foreign-type ev-loop (c-pointer "struct ev_loop"))
 
 (define-foreign-type ev-io "struct ev_io")
+(define-foreign-type *ev-io (c-pointer ev-io))
 (define-foreign-type ev-timer "ev_timer")
 (define-foreign-type *ev-timer (c-pointer ev-timer))
 (define-foreign-type ev-cs-timer "cs_ev_timer")
-
 
 (define ev-version-major (foreign-lambda int "ev_version_major"))
 (define ev-version-minor (foreign-lambda int "ev_version_minor"))
@@ -69,6 +79,9 @@
 (define cs-stop-and-free-timer (foreign-lambda void"cs_stop_and_free_timer" ev-loop *ev-timer))
 (define cs-free-timer (foreign-lambda void"cs_free_timer" *ev-timer))
 
+(define ev-io-init (foreign-lambda void "ev_io_init" *ev-io (function void (ev-loop *ev-io int)) ev-fd ev-events))
+(define ev-io-start (foreign-lambda void "ev_io_start" ev-loop *ev-io))
+
 ; main
 
 ; create the event loop
@@ -85,7 +98,6 @@
 		"C_return(malloc(sizeof(ev_timer)));"))
 
 (define timeout_watcher (mk-ev-timer))
-
 (define k 0)
 
 (define-external (hello_cb (ev-loop l) 
@@ -123,6 +135,24 @@
 						(print "stopping timer: zt")
 				 		(cs-stop-and-free-timer l zt))))))
 	(cs-start-timer l zt zl)) ; start the timer
+
+; io
+
+(define mk-ev-io 
+	(foreign-lambda* *ev-io ()
+		"C_return(malloc(sizeof(ev_io)));"))
+(define stdin_watcher (mk-ev-io))
+
+(define-external (stdin_cb (ev-loop l) 
+		 	  		 (*ev-io fd)
+		 	  		 (int n)) 
+	void 
+	(display "got some data: ")
+	(print (read-line)))
+
+(ev-io-init stdin_watcher #$stdin_cb 0 1)
+(ev-io-start l stdin_watcher)
+
 
 ; start the loop
 
