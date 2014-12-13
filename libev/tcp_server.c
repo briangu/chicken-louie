@@ -10,6 +10,7 @@
 
 #define PORT_NO 3033
 #define BUFFER_SIZE 1024
+#define LISTEN_QUEUE_LENGTH 16*1024
 
 int total_clients = 0;  // Total number of connected clients
 
@@ -97,7 +98,7 @@ void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
     return;
   }
 
-// Receive message from client socket
+  // Receive message from client socket
   read = recv(watcher->fd, buffer, BUFFER_SIZE, 0);
   if(read < 0) {
     printf("read error");
@@ -111,7 +112,7 @@ void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
     printf("%d client(s) connected.\n", total_clients);
     return;
   } else {
-    printf("message:%s", buffer);
+    // printf("message:%s", buffer);
     if (buffer[0] == 'q') {
       printf("quitting\n");
       exit(1);
@@ -158,8 +159,6 @@ void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
 
 int main() {
   int sd;
-  struct sockaddr_in addr;
-  int addr_len = sizeof(addr);
 
   // Create server socket
   if((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
@@ -167,19 +166,15 @@ int main() {
     return -1;
   }
 
-  int on = 1;
-  int off = 0;
-#ifdef WIN32
-  setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char*) &off, sizeof(on));
-#else
-  setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (void*) &off, sizeof(on));
-#endif
+  int option_value = 0;
+  setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char*) &option_value, sizeof(option_value));
 
-  if (make_socket_nonblocking(sd) == -1) { 
+  if (make_socket_nonblocking(sd) == -1) {
     printf("failed to set socket to nonblocking mode");
     return -1;
   }
 
+  struct sockaddr_in addr;
   bzero(&addr, sizeof(addr));
   addr.sin_family = AF_INET;
   addr.sin_port = htons(PORT_NO);
@@ -191,7 +186,7 @@ int main() {
   }
 
   // Start listing on the socket
-  if (listen(sd, 2) < 0) {
+  if (listen(sd, LISTEN_QUEUE_LENGTH) < 0) {
     printf("listen error");
     return -1;
   }
@@ -213,4 +208,3 @@ int main() {
 
   return 0;
 }
-
