@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <strings.h>
 #include <ev.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #define PORT_NO 3033
 #define BUFFER_SIZE 1024
@@ -18,6 +20,21 @@ typedef struct ev_fork_child {
 
 void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents);
 void child_cb(EV_P_ ev_child *w, int revents);
+
+int make_socket_nonblocking(int fd)
+{
+    // non blocking (fix for windows)
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        printf("make_socket_nonblocking: fcntl(F_GETFL) failed, errno: %s\n", strerror(errno));
+        return -1;
+    }
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        printf("make_socket_nonblocking: fcntl(F_SETFL) failed, errno: %s\n", strerror(errno));
+        return -1;
+    }
+    return 1;
+}
 
 pid_t create_child_process(int sd) {
   printf("attempting to create child process\n");
@@ -125,6 +142,11 @@ void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
     return;
   }
 
+  if (make_socket_nonblocking(client_sd) == -1) { 
+    printf("failed to set accepted socket to nonblocking mode");
+    return;
+  }
+
   total_clients ++; // Increment total_clients count
   printf("Successfully connected with client.\n");
   printf("%d client(s) connected.\n", total_clients);
@@ -142,6 +164,19 @@ int main() {
   // Create server socket
   if((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
     printf("socket error");
+    return -1;
+  }
+
+  int on = 1;
+  int off = 0;
+#ifdef WIN32
+  setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char*) &off, sizeof(on));
+#else
+  setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (void*) &off, sizeof(on));
+#endif
+
+  if (make_socket_nonblocking(sd) == -1) { 
+    printf("failed to set socket to nonblocking mode");
     return -1;
   }
 
