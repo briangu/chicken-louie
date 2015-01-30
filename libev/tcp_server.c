@@ -1,6 +1,7 @@
 // http://codefundas.blogspot.com/2010/09/create-tcp-echo-server-using-libev.html
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <strings.h>
@@ -11,21 +12,37 @@
 #define PORT_NO 3033
 #define BUFFER_SIZE 1024
 #define LISTEN_QUEUE_LENGTH 16*1024
+#define DEFAULT_CHILD_PROCESS_COUNT 8 // ideally one per processor
 
 int total_clients = 0;  // Total number of connected clients
 
 typedef struct ev_fork_child {
   ev_child child;
   int sd;
+  int process_number;
 } ev_fork_child;
 
+ev_fork_child * child_processes[DEFAULT_CHILD_PROCESS_COUNT];
+
 void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents);
+
+void watch_child(struct ev_loop *loop, int sd, pid_t pid, int process_number);
+void unwatch_child(struct ev_loop *loop, int process_number);
 void child_cb(EV_P_ ev_child *w, int revents);
 
+void plog(const char *format, ...) {
+  printf("%d: ", getpid());
+
+  va_list argptr;
+  va_start(argptr, format);
+  vfprintf(stdout, format, argptr);
+  va_end(argptr);
+}
+
 void handle_received_data(char *buffer, int read, int buffer_size) {
-    // printf("message:%s", buffer);
+    // plog("message:%s", buffer);
     if (buffer[0] == 'q') {
-      printf("quitting\n");
+      plog("quitting\n");
       exit(1);
     } 
 }
@@ -35,24 +52,34 @@ int make_socket_nonblocking(int fd)
     // non blocking (fix for windows)
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags == -1) {
-        printf("make_socket_nonblocking: fcntl(F_GETFL) failed, errno: %s\n", strerror(errno));
+        plog("make_socket_nonblocking: fcntl(F_GETFL) failed, errno: %s\n", strerror(errno));
         return -1;
     }
     if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        printf("make_socket_nonblocking: fcntl(F_SETFL) failed, errno: %s\n", strerror(errno));
+        plog("make_socket_nonblocking: fcntl(F_SETFL) failed, errno: %s\n", strerror(errno));
         return -1;
     }
     return 1;
 }
 
-pid_t create_child_process(int sd) {
-  printf("attempting to create child process\n");
+pid_t create_child_process(struct ev_loop *parent_loop, int sd, int process_number) {
   pid_t pid = fork();
-  printf("pid_1 = %d\n", pid);
   if (pid == 0) {
     // child process
+    plog("new child process: %d\n", getpid());
+
     // Initialize and start a watcher to accepts client requests
+    ev_loop_fork(parent_loop);
+    
     struct ev_loop *loop = EV_DEFAULT;
+
+    // TODO: unwatch other children
+    for (int i = 0; i < DEFAULT_CHILD_PROCESS_COUNT; i++) {
+      if (i != process_number && child_processes[i]) {
+        unwatch_child(loop, i);
+      }
+    }
+
     struct ev_io w_accept;
     ev_io_init(&w_accept, accept_cb, sd, EV_READ);
     ev_io_start(loop, &w_accept);
@@ -60,39 +87,51 @@ pid_t create_child_process(int sd) {
     while (1) {
       ev_loop(loop, 0);
     }
+  } else if (pid > 0) {
+    plog("created child process for %d\n", process_number);
+    watch_child(parent_loop, sd, pid, process_number);
+  } else {
+    plog("failed to create child process for %d\n", process_number);
   }
-  printf("pid_2 = %d\n", pid);
+
+  plog("pid_2 = %d\n", pid);
 
   return pid;
 }
 
-void watch_child(struct ev_loop *loop, int sd, pid_t pid) {
-  printf("watching child %d\n", pid);
+void watch_child(struct ev_loop *loop, int sd, pid_t pid, int process_number) {
+  plog("watching child %d\n", pid);
   ev_fork_child *cw = malloc(sizeof(ev_fork_child));
   cw->sd = sd;
+  cw->process_number = process_number;
   ev_child_init (&cw->child, child_cb, pid, 0);
   ev_child_start (EV_DEFAULT_ (ev_child *)cw);
+  child_processes[process_number] = cw;
+}
+
+void unwatch_child(struct ev_loop *loop, int process_number) {
+  plog("unwatching child process %d\n", process_number);
+  ev_fork_child *cw = child_processes[process_number];
+  ev_child_stop (loop, (ev_child *)cw);
 }
 
 void child_cb(EV_P_ ev_child *ec, int revents) {
-  printf("child_cb\n");
-
   ev_fork_child *fork_child = (ev_fork_child *)ec;
   ev_child *w = &fork_child->child;
 
+  plog ("child process %d exited with status %x. respawning.\n", w->rpid, w->rstatus);
+  
+  // stop monitoring the, now dead, child process
   ev_child_stop (EV_A_ w);
-  printf ("child process %d exited with status %x\n", w->rpid, w->rstatus);
 
   int sd = fork_child->sd;
   free(fork_child);
 
-  pid_t pid = create_child_process(sd);
+  pid_t pid = create_child_process(loop, sd, fork_child->process_number);
   if (pid > 0) {
-    printf ("created new child process %d\n", pid);
-    watch_child(loop, sd, pid);
+    plog("respawed new child process %d\n", pid);
   } else {
-    // failure to create child process
-    printf("failed to create child process: %d\n", pid);
+    plog("failed to respawn child process: %d\n", pid);
   }
 }
 
@@ -102,7 +141,7 @@ void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
   ssize_t read;
 
   if(EV_ERROR & revents) {
-    printf("got invalid event");
+    plog("got invalid event");
     return;
   }
 
@@ -111,15 +150,15 @@ void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
   if (read > 0) {
     handle_received_data(buffer, read, BUFFER_SIZE);
   } else if(read < 0) {
-    printf("read error");
+    plog("read error");
     return;
   } else if(read == 0) {
     // Stop and free watcher if client socket is closing
     ev_io_stop(loop, watcher);
     free(watcher);
-    printf("peer might closing");
+    plog("peer might closing");
     total_clients --; // Decrement total_clients count
-    printf("%d client(s) connected.\n", total_clients);
+    plog("%d client(s) connected.\n", total_clients);
     return;
   }
 
@@ -136,25 +175,27 @@ void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
   struct ev_io *w_client = (struct ev_io*) malloc (sizeof(struct ev_io));
 
   if(EV_ERROR & revents) {
-    printf("got invalid event");
+    plog("got invalid event");
     return;
   }
 
-// Accept client request
+  // Accept client request
   client_sd = accept(watcher->fd, (struct sockaddr *)&client_addr, &client_len);
   if (client_sd < 0) {
-    printf("accept error");
+    if (errno != EAGAIN) {
+      plog("accept error %d\n", errno);
+    }
     return;
   }
 
   if (make_socket_nonblocking(client_sd) == -1) { 
-    printf("failed to set accepted socket to nonblocking mode");
+    plog("failed to set accepted socket to nonblocking mode");
     return;
   }
 
   total_clients ++; // Increment total_clients count
-  printf("Successfully connected with client.\n");
-  printf("%d client(s) connected.\n", total_clients);
+  plog("Successfully connected with client.\n");
+  plog("%d client(s) connected.\n", total_clients);
 
   // Initialize and start watcher to read client requests
   ev_io_init(w_client, read_cb, client_sd, EV_READ);
@@ -166,7 +207,7 @@ int initilaize_socket(int port) {
 
   // Create server socket
   if((sd = socket(PF_INET, SOCK_STREAM, 0)) < 0) {
-    printf("socket error");
+    plog("socket error");
     return -1;
   }
 
@@ -174,7 +215,7 @@ int initilaize_socket(int port) {
   setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, (char*) &option_value, sizeof(option_value));
 
   if (make_socket_nonblocking(sd) == -1) {
-    printf("failed to set socket to nonblocking mode");
+    plog("failed to set socket to nonblocking mode");
     return -1;
   }
 
@@ -186,12 +227,12 @@ int initilaize_socket(int port) {
 
   // Bind socket to address
   if (bind(sd, (struct sockaddr*) &addr, sizeof(addr)) != 0) {
-    printf("bind error");
+    plog("bind error");
   }
 
   // Start listing on the socket
   if (listen(sd, LISTEN_QUEUE_LENGTH) < 0) {
-    printf("listen error");
+    plog("listen error");
     return -1;
   }
 
@@ -201,23 +242,30 @@ int initilaize_socket(int port) {
 int main() {
   int sd = initilaize_socket(PORT_NO);
   if (sd == -1) {
-    printf("failed to initialize socket");
+    plog("failed to initialize socket");
     return -1;
   }
 
-  pid_t pid = create_child_process(sd);
-  if (pid > 0) {
-    // parent (this) process
-    // watch child processes
-    struct ev_loop *loop = EV_DEFAULT;
-    watch_child(loop, sd, pid);
+  struct ev_loop *loop = EV_DEFAULT;
 
-    while (1) {
-      ev_loop(loop, 0);
+  // empty the child process slots so that child processes know which childs to unwatch
+  for (int i = 0; i < DEFAULT_CHILD_PROCESS_COUNT; i++) {
+    child_processes[i] = NULL;
+  }
+
+  for (int i = 0; i < DEFAULT_CHILD_PROCESS_COUNT; i++) {
+    pid_t pid = create_child_process(loop, sd, i);
+    if (pid > 0) {
+      // parent (this) process
+      plog("Successfully created child process: %d\n", pid);
+    } else {
+      // failure to create child process
+      plog("Failed to create child process: %d\n", pid);
     }
-  } else {
-    // failure to create child process
-    printf("failed to create child process: %d\n", pid);
+  }
+
+  while (1) {
+    ev_loop(loop, 0);
   }
 
   return 0;
