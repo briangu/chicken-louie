@@ -1,10 +1,16 @@
 // http://codefundas.blogspot.com/2010/09/create-tcp-echo-server-using-libev.html
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include <netinet/in.h>
-#include <unistd.h>
-#include <strings.h>
 #include <ev.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -12,9 +18,23 @@
 #define PORT_NO 3033
 #define BUFFER_SIZE 1024
 #define LISTEN_QUEUE_LENGTH 16*1024
-#define DEFAULT_CHILD_PROCESS_COUNT 8 // ideally one per processor
+#define MIN_CHILD_PROCESS_COUNT 4 // ideally one per processor
 
-int total_clients = 0;  // Total number of connected clients
+#define MAX(a,b) \
+   ({ __typeof__ (a) _a = (a); \
+      __typeof__ (b) _b = (b); \
+     _a > _b ? _a : _b; })
+
+int g_num_procs = MIN_CHILD_PROCESS_COUNT;
+
+// pid of the master process
+pid_t g_master_pid = 0; 
+
+// Total number of connected clients
+int g_total_clients = 0;
+
+char response_buffer[1024];
+int response_buffer_len;
 
 typedef struct ev_fork_child {
   ev_child child;
@@ -22,12 +42,17 @@ typedef struct ev_fork_child {
   int process_number;
 } ev_fork_child;
 
-ev_fork_child * child_processes[DEFAULT_CHILD_PROCESS_COUNT];
+typedef struct ev_io_child {
+  ev_io child;
+  char buffer[BUFFER_SIZE];
+} ev_io_child;
 
-void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents);
+ev_fork_child ** child_processes = NULL;
 
-void watch_child(struct ev_loop *loop, int sd, pid_t pid, int process_number);
-void unwatch_child(struct ev_loop *loop, int process_number);
+void accept_cb(EV_P_ struct ev_io *watcher, int revents);
+
+void watch_child(EV_P_ int sd, pid_t pid, int process_number);
+void unwatch_child(EV_P_ int process_number);
 void child_cb(EV_P_ ev_child *w, int revents);
 
 void plog(const char *format, ...) {
@@ -39,12 +64,14 @@ void plog(const char *format, ...) {
   va_end(argptr);
 }
 
-void handle_received_data(char *buffer, int read, int buffer_size) {
+void handle_received_data(int fd, char *buffer, int read, int buffer_size) {
     // plog("message:%s", buffer);
-    if (buffer[0] == 'q') {
-      plog("quitting\n");
-      exit(1);
-    } 
+    // if (buffer[0] == 'q') {
+    //   plog("quitting\n");
+    //   exit(1);
+    // } 
+  // Send message bach to the client
+  send(fd, response_buffer, response_buffer_len, 0);
 }
 
 int make_socket_nonblocking(int fd)
@@ -62,34 +89,34 @@ int make_socket_nonblocking(int fd)
     return 1;
 }
 
-pid_t create_child_process(struct ev_loop *parent_loop, int sd, int process_number) {
+pid_t create_child_process(EV_P_ int sd, int process_number) {
   pid_t pid = fork();
   if (pid == 0) {
     // child process
     plog("new child process: %d\n", getpid());
 
     // Initialize and start a watcher to accepts client requests
-    ev_loop_fork(parent_loop);
+    ev_loop_fork(loop);
     
-    struct ev_loop *loop = EV_DEFAULT;
+    struct ev_loop *child_loop = EV_DEFAULT;
 
     // TODO: unwatch other children
-    for (int i = 0; i < DEFAULT_CHILD_PROCESS_COUNT; i++) {
+    for (int i = 0; i < g_num_procs; i++) {
       if (i != process_number && child_processes[i]) {
-        unwatch_child(loop, i);
+        unwatch_child(child_loop, i);
       }
     }
 
-    struct ev_io w_accept;
-    ev_io_init(&w_accept, accept_cb, sd, EV_READ);
-    ev_io_start(loop, &w_accept);
+    struct ev_io_child w_accept;
+    ev_io_init((ev_io *)&w_accept, accept_cb, sd, EV_READ);
+    ev_io_start(child_loop, (ev_io *)&w_accept);
 
     while (1) {
-      ev_loop(loop, 0);
+      ev_loop(child_loop, 0);
     }
   } else if (pid > 0) {
     plog("created child process for %d\n", process_number);
-    watch_child(parent_loop, sd, pid, process_number);
+    watch_child(loop, sd, pid, process_number);
   } else {
     plog("failed to create child process for %d\n", process_number);
   }
@@ -99,7 +126,7 @@ pid_t create_child_process(struct ev_loop *parent_loop, int sd, int process_numb
   return pid;
 }
 
-void watch_child(struct ev_loop *loop, int sd, pid_t pid, int process_number) {
+void watch_child(EV_P_ int sd, pid_t pid, int process_number) {
   plog("watching child %d\n", pid);
   ev_fork_child *cw = malloc(sizeof(ev_fork_child));
   cw->sd = sd;
@@ -109,25 +136,30 @@ void watch_child(struct ev_loop *loop, int sd, pid_t pid, int process_number) {
   child_processes[process_number] = cw;
 }
 
-void unwatch_child(struct ev_loop *loop, int process_number) {
+void unwatch_child(EV_P_ int process_number) {
   plog("unwatching child process %d\n", process_number);
   ev_fork_child *cw = child_processes[process_number];
-  ev_child_stop (loop, (ev_child *)cw);
+  ev_child_stop(EV_A_ (ev_child *)cw);
 }
 
 void child_cb(EV_P_ ev_child *ec, int revents) {
+  // don't respawn processes unless master
+  if (getpid() != g_master_pid) {
+    return;
+  }
+
   ev_fork_child *fork_child = (ev_fork_child *)ec;
   ev_child *w = &fork_child->child;
 
   plog ("child process %d exited with status %x. respawning.\n", w->rpid, w->rstatus);
-  
+
   // stop monitoring the, now dead, child process
   ev_child_stop (EV_A_ w);
 
   int sd = fork_child->sd;
   free(fork_child);
 
-  pid_t pid = create_child_process(loop, sd, fork_child->process_number);
+  pid_t pid = create_child_process(EV_A_ sd, fork_child->process_number);
   if (pid > 0) {
     plog("respawed new child process %d\n", pid);
   } else {
@@ -136,39 +168,42 @@ void child_cb(EV_P_ ev_child *ec, int revents) {
 }
 
 /* Read client message */
-void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
-  char buffer[BUFFER_SIZE];
+void read_cb(EV_P_ struct ev_io *watcher, int revents) {
+  char *buffer = ((ev_io_child *)watcher)->buffer;
   ssize_t read;
 
   if(EV_ERROR & revents) {
-    plog("got invalid event");
+    plog("got invalid event\n");
     return;
   }
 
   // Receive message from client socket
   read = recv(watcher->fd, buffer, BUFFER_SIZE, 0);
   if (read > 0) {
-    handle_received_data(buffer, read, BUFFER_SIZE);
+    handle_received_data(watcher->fd, buffer, read, BUFFER_SIZE);
+    // ev_io_stop(EV_A_ watcher);
+    // free(watcher);
+    // g_total_clients --; // Decrement g_total_clients count
   } else if(read < 0) {
     plog("read error");
     return;
   } else if(read == 0) {
     // Stop and free watcher if client socket is closing
-    ev_io_stop(loop, watcher);
+    ev_io_stop(EV_A_ watcher);
     free(watcher);
-    plog("peer might closing");
-    total_clients --; // Decrement total_clients count
-    plog("%d client(s) connected.\n", total_clients);
+    plog("peer might closing\n");
+    g_total_clients --; // Decrement g_total_clients count
+    plog("%d client(s) connected.\n", g_total_clients);
     return;
   }
 
-  // Send message bach to the client
-  send(watcher->fd, buffer, read, 0);
+#ifdef ZERO_AFTER_READ  
   bzero(buffer, read);
+#endif
 }
 
 /* Accept client requests */
-void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
+void accept_cb(EV_P_ struct ev_io *watcher, int revents) {
   struct sockaddr_in client_addr;
   socklen_t client_len = sizeof(client_addr);
   int client_sd;
@@ -193,16 +228,16 @@ void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
     return;
   }
 
-  total_clients ++; // Increment total_clients count
+  g_total_clients ++; // Increment g_total_clients count
   plog("Successfully connected with client.\n");
-  plog("%d client(s) connected.\n", total_clients);
+  plog("%d client(s) connected.\n", g_total_clients);
 
   // Initialize and start watcher to read client requests
   ev_io_init(w_client, read_cb, client_sd, EV_READ);
-  ev_io_start(loop, w_client);
+  ev_io_start(EV_A_ w_client);
 }
 
-int initilaize_socket(int port) {
+int initialize_socket(int port) {
   int sd;
 
   // Create server socket
@@ -239,22 +274,68 @@ int initilaize_socket(int port) {
   return sd;
 }
 
+int get_processor_count() {
+  long nprocs = -1;
+  long nprocs_max = -1;
+
+#ifdef _WIN32
+#ifndef _SC_NPROCESSORS_ONLN
+SYSTEM_INFO info;
+GetSystemInfo(&info);
+#define sysconf(a) info.dwNumberOfProcessors
+#define _SC_NPROCESSORS_ONLN
+#endif
+#endif
+
+#ifdef _SC_NPROCESSORS_ONLN
+  nprocs = sysconf(_SC_NPROCESSORS_ONLN);
+  if (nprocs < 1) {
+    plog("Could not determine number of CPUs online:\n%s\n", strerror (errno));
+  }
+
+  return MAX(nprocs, MIN_CHILD_PROCESS_COUNT);
+#else
+  fprintf(stderr, "Could not determine number of CPUs");
+  return MIN_CHILD_PROCESS_COUNT;
+#endif
+}
+
 int main() {
-  int sd = initilaize_socket(PORT_NO);
+  plog("master starting\n");
+
+  sprintf(response_buffer, 
+    "HTTP/1.0 200 OK\r\n"
+    "Date: Fri, 30 Jan 2015 23:53:09 GMT\r\n"
+    "Server: SimpleHTTP/0.6 Python/2.7.8\r\n"
+    "Accept-Ranges: bytes\r\n"
+    "Content-Length: 13\r\n"
+    "Content-type: text/html\r\n"
+    "Connection: keep-alive\r\n"
+    "\r\n"
+    "Hello world!\n");
+  response_buffer_len = strlen(response_buffer);
+
+  g_master_pid = getpid();
+
+  g_num_procs = get_processor_count();
+
+  plog("using %d child threads\n");
+
+  child_processes = malloc(g_num_procs * sizeof(ev_fork_child *));
+
+  int sd = initialize_socket(PORT_NO);
   if (sd == -1) {
     plog("failed to initialize socket");
     return -1;
   }
 
-  struct ev_loop *loop = EV_DEFAULT;
-
   // empty the child process slots so that child processes know which childs to unwatch
-  for (int i = 0; i < DEFAULT_CHILD_PROCESS_COUNT; i++) {
+  for (int i = 0; i < g_num_procs; i++) {
     child_processes[i] = NULL;
   }
 
-  for (int i = 0; i < DEFAULT_CHILD_PROCESS_COUNT; i++) {
-    pid_t pid = create_child_process(loop, sd, i);
+  for (int i = 0; i < g_num_procs; i++) {
+    pid_t pid = create_child_process(EV_DEFAULT_ sd, i);
     if (pid > 0) {
       // parent (this) process
       plog("Successfully created child process: %d\n", pid);
@@ -265,7 +346,7 @@ int main() {
   }
 
   while (1) {
-    ev_loop(loop, 0);
+    ev_loop(EV_DEFAULT_ 0);
   }
 
   return 0;
