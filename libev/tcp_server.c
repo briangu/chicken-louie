@@ -195,7 +195,7 @@ int initilaize_socket(int port) {
     return -1;
   }
 
-  return sd;  
+  return sd;
 }
 
 int main() {
