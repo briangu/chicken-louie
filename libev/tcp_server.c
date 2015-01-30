@@ -22,6 +22,14 @@ typedef struct ev_fork_child {
 void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents);
 void child_cb(EV_P_ ev_child *w, int revents);
 
+void handle_received_data(char *buffer, int read, int buffer_size) {
+    // printf("message:%s", buffer);
+    if (buffer[0] == 'q') {
+      printf("quitting\n");
+      exit(1);
+    } 
+}
+
 int make_socket_nonblocking(int fd)
 {
     // non blocking (fix for windows)
@@ -44,7 +52,7 @@ pid_t create_child_process(int sd) {
   if (pid == 0) {
     // child process
     // Initialize and start a watcher to accepts client requests
-    struct ev_loop *loop = ev_default_loop(0);
+    struct ev_loop *loop = EV_DEFAULT;
     struct ev_io w_accept;
     ev_io_init(&w_accept, accept_cb, sd, EV_READ);
     ev_io_start(loop, &w_accept);
@@ -100,7 +108,9 @@ void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
 
   // Receive message from client socket
   read = recv(watcher->fd, buffer, BUFFER_SIZE, 0);
-  if(read < 0) {
+  if (read > 0) {
+    handle_received_data(buffer, read, BUFFER_SIZE);
+  } else if(read < 0) {
     printf("read error");
     return;
   } else if(read == 0) {
@@ -111,12 +121,6 @@ void read_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
     total_clients --; // Decrement total_clients count
     printf("%d client(s) connected.\n", total_clients);
     return;
-  } else {
-    // printf("message:%s", buffer);
-    if (buffer[0] == 'q') {
-      printf("quitting\n");
-      exit(1);
-    } 
   }
 
   // Send message bach to the client
@@ -157,7 +161,7 @@ void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents) {
   ev_io_start(loop, w_client);
 }
 
-int main() {
+int initilaize_socket(int port) {
   int sd;
 
   // Create server socket
@@ -177,7 +181,7 @@ int main() {
   struct sockaddr_in addr;
   bzero(&addr, sizeof(addr));
   addr.sin_family = AF_INET;
-  addr.sin_port = htons(PORT_NO);
+  addr.sin_port = htons(port);
   addr.sin_addr.s_addr = INADDR_ANY;
 
   // Bind socket to address
@@ -191,11 +195,21 @@ int main() {
     return -1;
   }
 
+  return sd;  
+}
+
+int main() {
+  int sd = initilaize_socket(PORT_NO);
+  if (sd == -1) {
+    printf("failed to initialize socket");
+    return -1;
+  }
+
   pid_t pid = create_child_process(sd);
   if (pid > 0) {
     // parent (this) process
     // watch child processes
-    struct ev_loop *loop = ev_default_loop(0);
+    struct ev_loop *loop = EV_DEFAULT;
     watch_child(loop, sd, pid);
 
     while (1) {
