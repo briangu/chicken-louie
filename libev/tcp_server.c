@@ -25,6 +25,17 @@
       __typeof__ (b) _b = (b); \
      _a > _b ? _a : _b; })
 
+typedef struct ev_fork_child {
+  ev_child child;
+  int sd;
+  int process_slot;
+} ev_fork_child;
+
+typedef struct ev_io_child {
+  ev_io child;
+  char buffer[BUFFER_SIZE];
+} ev_io_child;
+
 int g_num_procs = MIN_CHILD_PROCESS_COUNT;
 
 // pid of the master process
@@ -33,23 +44,9 @@ pid_t g_master_pid = 0;
 // Total number of connected clients
 int g_total_clients = 0;
 
-char response_buffer[1024];
-int response_buffer_len;
+ev_fork_child ** g_child_processes = NULL;
 
-typedef struct ev_fork_child {
-  ev_child child;
-  int sd;
-  int process_number;
-} ev_fork_child;
-
-typedef struct ev_io_child {
-  ev_io child;
-  char buffer[BUFFER_SIZE];
-} ev_io_child;
-
-ev_fork_child ** child_processes = NULL;
-
-pid_t create_child_process(EV_P_ int sd, int process_number);
+pid_t create_child_process(EV_P_ int sd, int process_slot);
 
 void plog(const char *format, ...) {
   printf("%d: ", getpid());
@@ -60,29 +57,32 @@ void plog(const char *format, ...) {
   va_end(argptr);
 }
 
+char response_buffer[1024];
+int response_buffer_len;
+
 void handle_received_data(int fd, char *buffer, int read, int buffer_size) {
-    // plog("message:%s", buffer);
-    // if (buffer[0] == 'q') {
-    //   plog("quitting\n");
-    //   exit(1);
-    // } 
+  plog("message:%s", buffer);
+  if (read >= 2 && buffer[0] == ':' && buffer[1] == 'q') {
+    plog("quitting\n");
+    exit(1);
+  } 
   // Send message bach to the client
-  send(fd, response_buffer, response_buffer_len, 0);
+  send(fd, buffer, read, 0);
 }
 
-int make_socket_nonblocking(int fd)
-{
-    // non blocking (fix for windows)
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
-        plog("make_socket_nonblocking: fcntl(F_GETFL) failed, errno: %s\n", strerror(errno));
-        return -1;
-    }
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-        plog("make_socket_nonblocking: fcntl(F_SETFL) failed, errno: %s\n", strerror(errno));
-        return -1;
-    }
-    return 1;
+int make_socket_nonblocking(int fd) {
+  // TODO: fix for windows
+  // non blocking
+  int flags = fcntl(fd, F_GETFL, 0);
+  if (flags == -1) {
+      plog("make_socket_nonblocking: fcntl(F_GETFL) failed, errno: %s\n", strerror(errno));
+      return -1;
+  }
+  if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+      plog("make_socket_nonblocking: fcntl(F_SETFL) failed, errno: %s\n", strerror(errno));
+      return -1;
+  }
+  return 1;
 }
 
 /* Read client message */
@@ -114,10 +114,6 @@ void read_cb(EV_P_ struct ev_io *watcher, int revents) {
     plog("%d client(s) connected.\n", g_total_clients);
     return;
   }
-
-#ifdef ZERO_AFTER_READ  
-  bzero(buffer, read);
-#endif
 }
 
 /* Accept client requests */
@@ -201,15 +197,15 @@ void child_cb(EV_P_ ev_child *ec, int revents) {
   ev_fork_child *fork_child = (ev_fork_child *)ec;
   ev_child *w = &fork_child->child;
 
-  plog ("child process %d exited with status %x. respawning.\n", w->rpid, w->rstatus);
+  plog("child process %d exited with status %x. respawning.\n", w->rpid, w->rstatus);
 
   // stop monitoring the, now dead, child process
-  ev_child_stop (EV_A_ w);
+  ev_child_stop(EV_A_ w);
 
   int sd = fork_child->sd;
   free(fork_child);
 
-  pid_t pid = create_child_process(EV_A_ sd, fork_child->process_number);
+  pid_t pid = create_child_process(EV_A_ sd, fork_child->process_slot);
   if (pid > 0) {
     plog("respawed new child process %d\n", pid);
   } else {
@@ -217,23 +213,23 @@ void child_cb(EV_P_ ev_child *ec, int revents) {
   }
 }
 
-void watch_child(EV_P_ int sd, pid_t pid, int process_number) {
+void watch_child(EV_P_ int sd, pid_t pid, int process_slot) {
   plog("watching child %d\n", pid);
   ev_fork_child *cw = malloc(sizeof(ev_fork_child));
   cw->sd = sd;
-  cw->process_number = process_number;
+  cw->process_slot = process_slot;
   ev_child_init (&cw->child, child_cb, pid, 0);
   ev_child_start (EV_DEFAULT_ (ev_child *)cw);
-  child_processes[process_number] = cw;
+  g_child_processes[process_slot] = cw;
 }
 
-void unwatch_child(EV_P_ int process_number) {
-  plog("unwatching child process %d\n", process_number);
-  ev_fork_child *cw = child_processes[process_number];
+void unwatch_child(EV_P_ int process_slot) {
+  plog("unwatching child process %d\n", process_slot);
+  ev_fork_child *cw = g_child_processes[process_slot];
   ev_child_stop(EV_A_ (ev_child *)cw);
 }
 
-pid_t create_child_process(EV_P_ int sd, int process_number) {
+pid_t create_child_process(EV_P_ int sd, int process_slot) {
   pid_t pid = fork();
   if (pid == 0) {
     // child process
@@ -246,7 +242,7 @@ pid_t create_child_process(EV_P_ int sd, int process_number) {
 
     // TODO: unwatch other children
     for (int i = 0; i < g_num_procs; i++) {
-      if (i != process_number && child_processes[i]) {
+      if (i != process_slot && g_child_processes[i]) {
         unwatch_child(child_loop, i);
       }
     }
@@ -259,21 +255,17 @@ pid_t create_child_process(EV_P_ int sd, int process_number) {
       ev_loop(child_loop, 0);
     }
   } else if (pid > 0) {
-    plog("created child process for %d\n", process_number);
-    watch_child(loop, sd, pid, process_number);
+    plog("created child process for %d\n", process_slot);
+    watch_child(loop, sd, pid, process_slot);
   } else {
-    plog("failed to create child process for %d\n", process_number);
+    plog("failed to create child process for %d\n", process_slot);
   }
-
-  plog("pid_2 = %d\n", pid);
 
   return pid;
 }
 
-
 int get_processor_count() {
-  long nprocs = -1;
-  long nprocs_max = -1;
+  long nprocs;
 
 #ifdef _WIN32
 #ifndef _SC_NPROCESSORS_ONLN
@@ -289,12 +281,11 @@ GetSystemInfo(&info);
   if (nprocs < 1) {
     plog("Could not determine number of CPUs online:\n%s\n", strerror (errno));
   }
-
-  return MAX(nprocs, MIN_CHILD_PROCESS_COUNT);
 #else
   fprintf(stderr, "Could not determine number of CPUs");
-  return MIN_CHILD_PROCESS_COUNT;
 #endif
+
+  return MAX(nprocs, MIN_CHILD_PROCESS_COUNT);
 }
 
 int main() {
@@ -313,12 +304,7 @@ int main() {
   response_buffer_len = strlen(response_buffer);
 
   g_master_pid = getpid();
-
   g_num_procs = get_processor_count();
-
-  plog("using %d child threads\n");
-
-  child_processes = malloc(g_num_procs * sizeof(ev_fork_child *));
 
   int sd = initialize_socket(PORT_NO);
   if (sd == -1) {
@@ -327,8 +313,10 @@ int main() {
   }
 
   // empty the child process slots so that child processes know which childs to unwatch
+  plog("using %d child threads\n", g_num_procs);
+  g_child_processes = malloc(g_num_procs * sizeof(ev_fork_child *));
   for (int i = 0; i < g_num_procs; i++) {
-    child_processes[i] = NULL;
+    g_child_processes[i] = NULL;
   }
 
   for (int i = 0; i < g_num_procs; i++) {
