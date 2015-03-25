@@ -15,7 +15,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
-extern void echo(char *str);
+#include "tcp_server.h"
+
+extern void handle_received_data(int fd, char *buffer, int read, int buffer_size);
 
 #define PORT_NO 3033
 #define BUFFER_SIZE 1024
@@ -61,17 +63,6 @@ void plog(const char *format, ...) {
 
 char response_buffer[1024];
 int response_buffer_len;
-
-void handle_received_data(int fd, char *buffer, int read, int buffer_size) {
-  // plog("message:%s", buffer);
-  echo(buffer);
-  if (read >= 2 && buffer[0] == ':' && buffer[1] == 'q') {
-    plog("quitting\n");
-    exit(1);
-  } 
-  // Send message bach to the client
-  send(fd, buffer, read, 0);
-}
 
 int make_socket_nonblocking(int fd) {
   // TODO: fix for windows
@@ -291,7 +282,6 @@ GetSystemInfo(&info);
   return MAX(nprocs, MIN_CHILD_PROCESS_COUNT);
 }
 
-//int main() {
 int start() {
   plog("master starting\n");
 
