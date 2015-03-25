@@ -1,0 +1,2 @@
+clang -I/opt/local/Cellar/libev/4.15//include -c -o tcp_server.o tcp_server.c
+chpl tcp_server.h tcp_server.o -L"/opt/twitter/Cellar/libev/4.15/lib" -lev echo.chpl

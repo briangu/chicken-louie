@@ -15,6 +15,8 @@
 #include <fcntl.h>
 #include <errno.h>
 
+extern void echo(char *str);
+
 #define PORT_NO 3033
 #define BUFFER_SIZE 1024
 #define LISTEN_QUEUE_LENGTH 16*1024
@@ -61,7 +63,8 @@ char response_buffer[1024];
 int response_buffer_len;
 
 void handle_received_data(int fd, char *buffer, int read, int buffer_size) {
-  plog("message:%s", buffer);
+  // plog("message:%s", buffer);
+  echo(buffer);
   if (read >= 2 && buffer[0] == ':' && buffer[1] == 'q') {
     plog("quitting\n");
     exit(1);
@@ -288,7 +291,8 @@ GetSystemInfo(&info);
   return MAX(nprocs, MIN_CHILD_PROCESS_COUNT);
 }
 
-int main() {
+//int main() {
+int start() {
   plog("master starting\n");
 
   sprintf(response_buffer, 
