@@ -18,15 +18,25 @@ Chicken scheme:
 
     brew install chicken
 
-Chapel
+Chapel (http://chapel.cray.com/download.html)
 
-    http://chapel.cray.com/download.html
-
+	brea install chapel
 
 COMPLING
 
+    make
 
-    make
+Chapel Example
+
+	chpl_tcp_server
+
+Chicken Scheme Example
+
+	chicken_ev
+
+C Example
+
+	c_tcp_server
 
 
 
