@@ -61,9 +61,6 @@ void plog(const char *format, ...) {
   va_end(argptr);
 }
 
-char response_buffer[1024];
-int response_buffer_len;
-
 int make_socket_nonblocking(int fd) {
   // TODO: fix for windows
   // non blocking
@@ -284,18 +281,6 @@ GetSystemInfo(&info);
 
 int start() {
   plog("master starting\n");
-
-  sprintf(response_buffer, 
-    "HTTP/1.0 200 OK\r\n"
-    "Date: Fri, 30 Jan 2015 23:53:09 GMT\r\n"
-    "Server: SimpleHTTP/0.6 Python/2.7.8\r\n"
-    "Accept-Ranges: bytes\r\n"
-    "Content-Length: 13\r\n"
-    "Content-type: text/html\r\n"
-    "Connection: keep-alive\r\n"
-    "\r\n"
-    "Hello world!\n");
-  response_buffer_len = strlen(response_buffer);
 
   g_master_pid = getpid();
   g_num_procs = get_processor_count();
