@@ -1,1 +1,0 @@
-clang -I/opt/local/Cellar/libev/4.15//include -L"/opt/twitter/Cellar/libev/4.15/lib" -lev -o tcp_server tcp_server.c tcp_server_main.c

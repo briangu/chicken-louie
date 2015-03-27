@@ -1,6 +1,0 @@
-#brew install chicken
-#brew install libev
-
-clang -I/opt/local/Cellar/chicken/4.9.0.1/include/chicken -I/opt/local/Cellar/libev/4.15//include -c callbacks.c
-
-csc -lev  -I/opt/twitter/Cellar/libev/4.15/include -L"/opt/twitter/Cellar/libev/4.15/lib -lev callbacks.o" libev.scm
