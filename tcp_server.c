@@ -17,10 +17,9 @@
 
 #include "tcp_server.h"
 
-extern void handle_received_data(int fd, char *buffer, int read, int buffer_size);
+extern void handle_received_data(int fd, char *buffer, size_t read, size_t buffer_size);
 
 #define PORT_NO 3033
-#define BUFFER_SIZE 1024
 #define LISTEN_QUEUE_LENGTH 16*1024
 #define MIN_CHILD_PROCESS_COUNT 4 // ideally one per processor
 
@@ -35,15 +34,10 @@ typedef struct ev_fork_child {
   int process_slot;
 } ev_fork_child;
 
-typedef struct ev_io_child {
-  ev_io child;
-  char buffer[BUFFER_SIZE];
-} ev_io_child;
-
 int g_num_procs = MIN_CHILD_PROCESS_COUNT;
 
 // pid of the master process
-pid_t g_master_pid = 0; 
+pid_t g_master_pid = 0;
 
 // Total number of connected clients
 int g_total_clients = 0;
@@ -78,7 +72,9 @@ int make_socket_nonblocking(int fd) {
 
 /* Read client message */
 void read_cb(EV_P_ struct ev_io *watcher, int revents) {
-  char *buffer = ((ev_io_child *)watcher)->buffer;
+  struct ev_io_child *child = (ev_io_child *)watcher;
+  int buffer_size = child->buffer_size;
+  char *buffer = child->buffer;
   ssize_t read;
 
   if(EV_ERROR & revents) {
@@ -87,9 +83,9 @@ void read_cb(EV_P_ struct ev_io *watcher, int revents) {
   }
 
   // Receive message from client socket
-  read = recv(watcher->fd, buffer, BUFFER_SIZE, 0);
+  read = recv(watcher->fd, buffer, buffer_size, 0);
   if (read > 0) {
-    handle_received_data(watcher->fd, buffer, read, BUFFER_SIZE);
+    handle_received_data(watcher->fd, buffer, read, buffer_size);
     // ev_io_stop(EV_A_ watcher);
     // free(watcher);
     // g_total_clients --; // Decrement g_total_clients count
@@ -112,7 +108,6 @@ void accept_cb(EV_P_ struct ev_io *watcher, int revents) {
   struct sockaddr_in client_addr;
   socklen_t client_len = sizeof(client_addr);
   int client_sd;
-  struct ev_io *w_client = (struct ev_io*) malloc (sizeof(struct ev_io));
 
   if(EV_ERROR & revents) {
     plog("got invalid event");
@@ -138,6 +133,9 @@ void accept_cb(EV_P_ struct ev_io *watcher, int revents) {
   plog("%d client(s) connected.\n", g_total_clients);
 
   // Initialize and start watcher to read client requests
+  struct ev_io *w_client = malloc(sizeof(ev_io_child) + 1024);
+  ((ev_io_child *)w_client)->buffer_size = 1024;
+  ((ev_io_child *)w_client)->buffer = ((char *)w_client) + sizeof(ev_io_child);
   ev_io_init(w_client, read_cb, client_sd, EV_READ);
   ev_io_start(EV_A_ w_client);
 }
@@ -238,13 +236,19 @@ pid_t create_child_process(EV_P_ int sd, int process_slot) {
       }
     }
 
-    struct ev_io_child w_accept;
-    ev_io_init((ev_io *)&w_accept, accept_cb, sd, EV_READ);
-    ev_io_start(child_loop, (ev_io *)&w_accept);
+    struct ev_io *w_accept = malloc(sizeof(ev_io));
+    ev_io_init(w_accept, accept_cb, sd, EV_READ);
+    ev_io_start(child_loop, w_accept);
+
+    plog("starting event loop.\n");
 
     while (1) {
       ev_loop(child_loop, 0);
     }
+
+    plog("exiting event loop.\n");
+
+    free(w_accept);
   } else if (pid > 0) {
     plog("created child process for %d\n", process_slot);
     watch_child(loop, sd, pid, process_slot);
