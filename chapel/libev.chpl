@@ -31,6 +31,7 @@ module LibEv {
 
   extern type ev_tstamp = c_double;
 
+// FEATURE: extern <extern type opt> record <internal type>
   extern record ev_loop {};
 
   extern record ev_io {}
@@ -60,6 +61,7 @@ module LibEv {
   extern proc ev_break(loop: opaque, x: c_int);
   extern proc ev_ref(loop: opaque);
   extern proc ev_unref(loop: opaque);
+// FEATURE: differentiate between type of ev_loop and function type of ev_loop so we don't need to use _fn
   extern ev_loop proc ev_loop_fn(loop: opaque, x: c_int);
   extern proc ev_unloop(loop: opaque, x: c_int);
 
@@ -72,5 +74,6 @@ module LibEv {
   extern proc ev_io_init(ref io: ev_io, fn, fd: ev_fd, events: ev_events);
   extern proc ev_io_start(loop: opaque, ref io: ev_io);
 
+// FEATURE: this returns a c_ptr(ev_loop) but can't be used as input to a (ref: loop ev_loop) arg list
   extern var EV_DEFAULT: opaque;
 }
