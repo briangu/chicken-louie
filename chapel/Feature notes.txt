@@ -24,3 +24,22 @@ make[1]: *** [/tmp/chpl-bguarraci-91221.deleteme/chpl_tcp_server.tmp] Error 1
 error: compiling generated source [mysystem.cpp:43]
 make: *** [chpl_tcp_server] Error 1
 
+...
+
+  // $CHPL_HOME/modules/internal/ChapelArray.chpl:2534: error: cannot iterate over values of type int(64) [functionResolution.cpp:2401]
+  for i in word.length {
+    // BUG: $CHPL_HOME/modules/internal/ChapelArray.chpl:2534: error: cannot iterate over values of type int(64) [functionResolution.cpp:2401]
+
+    writeln("ch: ", word.substring(i));
+  }
+
+  for i in word.length {
+    // BUG: $CHPL_HOME/modules/internal/ChapelArray.chpl:2534: error: cannot iterate over values of type int(64) [functionResolution.cpp:2401]
+
+    writeln("ch: ", substring(i));
+  }
+
+  for i in word.length {
+    writeln("ch: ", word[i];
+  }
+

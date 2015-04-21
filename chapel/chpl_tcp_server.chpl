@@ -13,7 +13,25 @@ config var port: c_int = 3033;
 export proc handle_received_data(fd: c_int, buffer: c_string, read: size_t, buffer_size: size_t) {
   // writeln("from chpl: " + buffer);
   // accumulate string buffer
-
+  var word = buffer;
+  var trimmedWord: string = "";
+  writeln("word: ", word);
+  for i in 1..word.length {
+  	var ch = word.substring(i);
+  	if (ch != "\r" && ch != "\n") {
+	  	writeln("ch: ", word.substring(i));
+	  	trimmedWord += word.substring(i);
+  	}
+  }
+//  writeln("trimmedWord: ", trimmedWord);
+	if (trimmedWord == "dump") {
+		dumpPartition(partitionForWord("dog"));
+	} else {
+		writeln("<adding>");
+	  indexWord(trimmedWord, 1);
+		dumpPostingTable(trimmedWord);
+		writeln("</adding>");
+	}
   send(fd, buffer, read, 0);
 }
 
@@ -28,7 +46,7 @@ proc initIndex() {
 	indexWord("cat", 2);
 	indexWord("cat", 3);
 	dumpPartition(partitionForWord("dog"));
-	// dumpPostingTable("cat");
+	dumpPostingTable("cat");
 }
 
 proc main(): c_long {
@@ -40,6 +58,9 @@ proc main(): c_long {
 		writeln("socket error");
 		return -1;
 	}
+
+	writeln("initializing index");
+	initIndex();
 
 	writeln("initializing event loop...");
 

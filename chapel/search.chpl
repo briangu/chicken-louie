@@ -77,7 +77,7 @@ module Search {
         newEntry.next = Entries[word];
         Entries[word] = newEntry;
       }
-      writeln("entries on partition ", here.id, " ", Entries);
+//      writeln("entries on partition ", here.id, " ", Entries);
     }
   }
 
