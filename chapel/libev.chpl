@@ -36,7 +36,7 @@ module LibEv {
 
   extern record ev_io {
     var fd: c_int;
-    var flags: c_int;
+    var events: c_int;
   }
   extern type ev_timer;
 
