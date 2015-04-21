@@ -34,7 +34,10 @@ module LibEv {
 // FEATURE: extern <extern type opt> record <internal type>
   extern record ev_loop {};
 
-  extern record ev_io {}
+  extern record ev_io {
+    var fd: c_int;
+    var flags: c_int;
+  }
   extern type ev_timer;
 
   extern proc ev_version_major(): c_int;
