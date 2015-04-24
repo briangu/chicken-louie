@@ -22,9 +22,12 @@ dumpEntries();
 Entries[1] = 3.141592;
 dumpEntries();
 
+var keysPerTask = 10;
+var expectedSize = here.maxTaskPar * keysPerTask + Entries.size;
+
 coforall i in 1..here.maxTaskPar {
   var randStream: RandomStream = new RandomStream();
-  for j in 1..10 {
+  for j in 1..keysPerTask {
     var key = randStream.getNext();
     var value = randStream.getNext();
     writeln("task #", j, " adding key: ", key, " value: ", value);
@@ -32,4 +35,7 @@ coforall i in 1..here.maxTaskPar {
   }
 }
 
+var actualSize = Entries.size;
+writeln("expectedSize: ", expectedSize, " actualSize: ", actualSize);
 dumpEntries();
+
