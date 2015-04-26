@@ -49,3 +49,31 @@ associative array domains:
 do associative array domains automatically get added?
 is adding to an associative array thread/task safe?
 
+
+...
+
+$CHPL_HOME/modules/standard/IO.chpl:1691: error: sync/single variables cannot currently be written - apply readFE/readFF() to those variables first
+
+var count$: sync int = 0;
+
+coforall i in 1..1000 {
+  writeln(i, " => ", count$);
+  count$ += 1;
+}
+
+....
+
+count is treated as a constant
+
+var indexing$: sync bool = false;
+var count: int = 0;
+
+coforall i in 1..1000 {
+  var baton = indexing$;
+  writeln(i, " => ", count);
+  count = count + 1;
+  indexing$ = true;
+}
+
+....
+
