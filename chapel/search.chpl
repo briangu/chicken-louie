@@ -28,15 +28,14 @@ module Search {
   //  or an associative array(s) that use the score or docid as index.
   class Entry {
     var word: string;
-    var score: real(64);
-    var documentCount: atomic int;
-    var documents: [1..1024] int(64);
+    var score: real;
+    var documentCount: int;
+    var documents: [0..1023] int(64);
   }
 
   class PartitionIndex {
-    var count: atomic int;
-    var words: domain(string);
-    var entries: [1..1024] Entry;
+    var count: int;
+    var entries: [0..1023] Entry; // TODO: use a hashtable once the general approach is validated
     var state$: sync int = 0;
   }
 
@@ -44,7 +43,7 @@ module Search {
   config var partitionDimensions = 16;
   var Partitions: [0..partitionDimensions-1] locale;
 
-  var Indices: [1..Partitions.size] PartitionIndex;
+  var Indices: [0..Partitions.size-1] PartitionIndex;
 
   proc initPartitions() {
     // project the partitions down to the locales
@@ -62,7 +61,7 @@ module Search {
   }
 
   proc partitionForWord(word: string): int {
-    return 1;
+    return 0;
   }
 
   proc localeForPartition(partition: int(64)) {
@@ -78,35 +77,50 @@ module Search {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
     on partitionIndex {
-
       var state = partitionIndex.state$;
 
-      if (!partitionIndex.words.member(word)) {
-        writeln("adding new entry ", word , " on partition ", partition);
-        partitionIndex.words += word;
-
-        var entry = new Entry();
-        entry.word = word;
-        entry.score = 0;        
-        entry.documents[entry.documentCount.read()] = docid;
-        entry.documentCount.add(1);
-
-        partitionIndex.entries[partitionIndex.count.read()] = entry;
-        partitionIndex.count.add(1);
-      } else {
+      if (indexContainsWord(word, partitionIndex)) {
         writeln("adding ", word, " to existing entries on partition ", partition);
-        var entryIndex = entryIndexForWord(word, partitionIndex);
-        var entry = partitionIndex.entries[entryIndex];
-        entry.documents[entry.documentCount.read()] = docid;
-        entry.documentCount.add(1);
+        var entry = entryForWord(word, partitionIndex);
+        if (entry.documentCount < entry.documents.size) {
+          entry.documents[entry.documentCount] = docid;
+          entry.documentCount += 1;
+        } else {
+          writeln("TODO: realloc documents");
+        }
+      } else {
+        writeln("adding new entry ", word , " on partition ", partition);
+
+        if (partitionIndex.count < partitionIndex.entries.size) {
+          var entry = new Entry();
+          entry.word = word;
+          entry.score = 0;        
+          entry.documents[entry.documentCount] = docid;
+          entry.documentCount += 1;
+
+          partitionIndex.entries[partitionIndex.count] = entry;
+          partitionIndex.count += 1;
+        }
       }
 
       partitionIndex.state$ = 0;
     }
   }
 
+  proc indexContainsWord(word: string, partitionIndex: PartitionIndex): bool {
+    return entryIndexForWord(word, partitionIndex) != -1;
+  }
+
+  proc entryForWord(word: string, partitionIndex: PartitionIndex): Entry {
+    var entryIndex = entryIndexForWord(word, partitionIndex);
+    if (entryIndex >= 0) {
+      return partitionIndex.entries[entryIndex];
+    }
+    return nil;
+  }
+
   proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): int {
-    for i in 1..partitionIndex.count.read() {
+    for i in 0..partitionIndex.count-1 {
       if (partitionIndex.entries[i].word == word) {
         return i;
       }
@@ -117,7 +131,7 @@ module Search {
   proc dumpEntry(entry: Entry) {
     on entry {
       writeln("word: ", entry.word, " score: ", entry.score);
-      for i in 1..entry.documentCount.read() {
+      for i in 0..entry.documentCount-1 {
         writeln("\t", entry.documents[i]);
       }
     }
@@ -126,13 +140,13 @@ module Search {
   proc dumpPartition(partition: int(64)) {
     var partitionIndex = Indices[partition];
     on partitionIndex {
-      writeln("entries on partition ", here.id, " ", partitionIndex.entries);
-      writeln("words on partition ", here.id, " ", partitionIndex.words);
+      writeln("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
 
       var word: string;
-      for word in partitionIndex.words.sorted() {
-        writeln("word: ", word);
-        dumpPostingTableForWord(word);
+      for i in 0..partitionIndex.count-1 {
+        var entry = partitionIndex.entries[i];
+        writeln("word: ", entry.word);
+        dumpPostingTableForWord(entry.word);
       }
     }
   }
@@ -141,7 +155,12 @@ module Search {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
     on partitionIndex {
-      dumpEntry(partitionIndex.entries[entryIndexForWord(word, partitionIndex)]);
+      var entryIndex = entryIndexForWord(word, partitionIndex);
+      if (entryIndex >= 0) {
+        dumpEntry(partitionIndex.entries[entryIndex]);
+      } else {
+        writeln("word (", word, ") is not in the index");
+      }
     }
   }
 }
