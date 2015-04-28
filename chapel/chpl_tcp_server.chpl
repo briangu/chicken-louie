@@ -31,7 +31,7 @@ export proc handle_received_data(fd: c_int, buffer: c_string, read: size_t, buff
 	} else {
 		writeln("<adding>");
 	  indexWord(trimmedWord, 1);
-		dumpPostingTable(trimmedWord);
+		dumpPostingTableForWord(trimmedWord);
 		writeln("</adding>");
 	}
   send(fd, buffer, read, 0);
@@ -48,7 +48,7 @@ proc initIndex() {
 	indexWord("cat", 2);
 	indexWord("cat", 3);
 	dumpPartition(partitionForWord("dog"));
-	dumpPostingTable("cat");
+	dumpPostingTableForWord("cat");
 }
 
 proc writeLocInfo(loc: locale) {
