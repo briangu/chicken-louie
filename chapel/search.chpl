@@ -24,18 +24,22 @@ module Search {
   
   use IO, Memory;
 
+  config const verbose = false;
+
+  type DocId = int(64);
+
   // for scoring and compactness purposes, consider making this use more contiguous memory,
   //  or an associative array(s) that use the score or docid as index.
   class Entry {
     var word: string;
     var score: real;
     var documentCount: int;
-    var documents: [0..1023] int(64);
+    var documents: [0..8192-1] DocId;
   }
 
   class PartitionIndex {
     var count: int;
-    var entries: [0..1023] Entry; // TODO: use a hashtable once the general approach is validated
+    var entries: [0..(1024*1024/2)-1] Entry; // TODO: use a hashtable once the general approach is validated
     var state$: sync int = 0;
   }
 
@@ -64,8 +68,8 @@ module Search {
     return 0;
   }
 
-  proc localeForPartition(partition: int(64)) {
-    writeln("index: ", partition % Partitions.size);
+  proc localeForPartition(partition: DocId) {
+    if (verbose) then writeln("index: ", partition % Partitions.size);
     return Partitions[partition % Partitions.size];
   }
 
@@ -73,23 +77,25 @@ module Search {
     return localeForPatition(hashFromWord(word));
   }
 
-  proc indexWord(word: string, docid: int(64)) {
+  proc indexWord(word: string, docid: DocId) {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
     on partitionIndex {
+      // writeln("attempting to get lock");
       var state = partitionIndex.state$;
+      // writeln("have lock");
 
       if (indexContainsWord(word, partitionIndex)) {
-        writeln("adding ", word, " to existing entries on partition ", partition);
+        if (verbose) then writeln("adding ", word, " to existing entries on partition ", partition);
         var entry = entryForWord(word, partitionIndex);
         if (entry.documentCount < entry.documents.size) {
           entry.documents[entry.documentCount] = docid;
           entry.documentCount += 1;
         } else {
-          writeln("TODO: realloc documents");
+          if (verbose) then writeln("TODO: realloc documents");
         }
       } else {
-        writeln("adding new entry ", word , " on partition ", partition);
+        if (verbose) then writeln("adding new entry ", word , " on partition ", partition);
 
         if (partitionIndex.count < partitionIndex.entries.size) {
           var entry = new Entry();
@@ -103,7 +109,9 @@ module Search {
         }
       }
 
+      // writeln("releasing lock");
       partitionIndex.state$ = 0;
+      // writeln("released lock");
     }
   }
 
@@ -137,7 +145,7 @@ module Search {
     }
   }
 
-  proc dumpPartition(partition: int(64)) {
+  proc dumpPartition(partition: DocId) {
     var partitionIndex = Indices[partition];
     on partitionIndex {
       writeln("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);

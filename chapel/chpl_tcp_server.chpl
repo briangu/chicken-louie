@@ -1,4 +1,4 @@
-use LibEv, IO, Search;
+use LibEv, IO, Indexer, Search;
 
 // TODO: port to pure chapel
 extern proc initialize_socket(port: c_int): c_int;
@@ -43,17 +43,27 @@ proc initIndex() {
 	writeln();
 
 	initPartitions();
+  initIndexer();
 
-  writeln("adding 3 entries");
-	indexWord("dog", 1);
-	indexWord("cat", 2);
-	indexWord("cat", 3);
+ //  writeln("adding 3 entries");
+	// indexWord("dog", 1);
+	// indexWord("cat", 2);
+	// indexWord("cat", 3);
 
-  writeln("dumping partition holding word: dog");
-	dumpPartition(partitionForWord("dog"));
+ //  writeln("dumping partition holding word: dog");
+	// dumpPartition(partitionForWord("dog"));
 
-  writeln("dumping posting table for word: cat");
-	dumpPostingTableForWord("cat");
+ //  writeln("dumping posting table for word: cat");
+	// dumpPostingTableForWord("cat");
+
+  var infile = open("words.txt", iomode.r);
+  var reader = infile.reader();
+  var word: string;
+  while (reader.readln(word)) {
+    enqueueIndexRequest(word, 1);
+  }
+
+  dumpPostingTableForWord("cat");
 }
 
 proc writeLocInfo(loc: locale) {
