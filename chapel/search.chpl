@@ -32,15 +32,27 @@ module Search {
   //  or an associative array(s) that use the score or docid as index.
   class Entry {
     var word: string;
-    var score: real;
-    var documentCount: int;
+    var score: real; // TODO: may not be needed if we use docCount as frequency
+    var documentCount: atomic_int64;
     var documents: [0..8192-1] DocId;
   }
 
   class PartitionIndex {
-    var count: int;
+    var count: atomic_int64;
     var entries: [0..(1024*1024/2)-1] Entry; // TODO: use a hashtable once the general approach is validated
-    var state$: sync int = 0;
+    var writerLock: atomicflag;
+
+    inline proc lockIndexWriter() {
+      // writeln("attempting to get lock");
+      while writerLock.testAndSet() do chpl_task_yield();
+      // writeln("have lock");
+    }
+
+    inline proc unlockIndexWriter() {
+      // writeln("releasing lock");
+      writerLock.clear();
+      // writeln("released lock");
+    }
   }
 
   // number of dimensions in the partition space
@@ -81,37 +93,35 @@ module Search {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
     on partitionIndex {
-      // writeln("attempting to get lock");
-      var state = partitionIndex.state$;
-      // writeln("have lock");
+      partitionIndex.lockIndexWriter();
 
-      if (indexContainsWord(word, partitionIndex)) {
+      var entry = entryForWord(word, partitionIndex);
+      if (entry != nil) {
         if (verbose) then writeln("adding ", word, " to existing entries on partition ", partition);
-        var entry = entryForWord(word, partitionIndex);
-        if (entry.documentCount < entry.documents.size) {
-          entry.documents[entry.documentCount] = docid;
-          entry.documentCount += 1;
+        var docCount = entry.documentCount.read();
+        if (docCount < entry.documents.size) {
+          entry.documents[docCount] = docid;
+          entry.documentCount.add(1);
         } else {
           if (verbose) then writeln("TODO: realloc documents");
         }
       } else {
         if (verbose) then writeln("adding new entry ", word , " on partition ", partition);
 
-        if (partitionIndex.count < partitionIndex.entries.size) {
-          var entry = new Entry();
+        var entriesCount = partitionIndex.count.read();
+        if (entriesCount < partitionIndex.entries.size) {
+          entry = new Entry();
           entry.word = word;
           entry.score = 0;        
-          entry.documents[entry.documentCount] = docid;
-          entry.documentCount += 1;
+          entry.documents[0] = docid;
+          entry.documentCount.add(1);
 
-          partitionIndex.entries[partitionIndex.count] = entry;
-          partitionIndex.count += 1;
+          partitionIndex.entries[entriesCount] = entry;
+          partitionIndex.count.add(1);
         }
       }
 
-      // writeln("releasing lock");
-      partitionIndex.state$ = 0;
-      // writeln("released lock");
+      partitionIndex.unlockIndexWriter();
     }
   }
 
@@ -128,7 +138,7 @@ module Search {
   }
 
   proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): int {
-    for i in 0..partitionIndex.count-1 {
+    for i in 0..partitionIndex.count.read()-1 {
       if (partitionIndex.entries[i].word == word) {
         return i;
       }
@@ -139,7 +149,7 @@ module Search {
   proc dumpEntry(entry: Entry) {
     on entry {
       writeln("word: ", entry.word, " score: ", entry.score);
-      for i in 0..entry.documentCount-1 {
+      for i in 0..entry.documentCount.read()-1 {
         writeln("\t", entry.documents[i]);
       }
     }
@@ -151,7 +161,7 @@ module Search {
       writeln("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
 
       var word: string;
-      for i in 0..partitionIndex.count-1 {
+      for i in 0..partitionIndex.count.read()-1 {
         var entry = partitionIndex.entries[i];
         writeln("word: ", entry.word);
         dumpPostingTableForWord(entry.word);
