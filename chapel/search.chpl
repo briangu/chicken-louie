@@ -25,6 +25,7 @@ module Search {
   use IO, Memory;
 
   config const verbose = false;
+  config const sync_writers = false;
 
   type DocId = int(64);
 
@@ -44,13 +45,13 @@ module Search {
 
     inline proc lockIndexWriter() {
       // writeln("attempting to get lock");
-      while writerLock.testAndSet() do chpl_task_yield();
+      if (sync_writers) then while writerLock.testAndSet() do chpl_task_yield();
       // writeln("have lock");
     }
 
     inline proc unlockIndexWriter() {
       // writeln("releasing lock");
-      writerLock.clear();
+      if (sync_writers) then writerLock.clear();
       // writeln("released lock");
     }
   }
