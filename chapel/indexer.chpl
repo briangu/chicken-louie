@@ -22,13 +22,6 @@ module Indexer {
     }
   }
 
-  proc enqueueIndexRequest(word: string, docId: DocId) {
-    var indexRequest = new IndexRequest(word, docId);
-    const idx = nextBufferIndex();
-    buff$(idx) = indexRequest;
-    if (verbose) then writeln("enqueuing ", indexRequest);
-  }
-
   proc nextBufferIndex(): int {
     var idx: int;
     var success = false;
@@ -38,6 +31,13 @@ module Indexer {
       success = bufferIndex.compareExchange(originalValue, idx);
     }
     return idx;
+  }
+
+  proc enqueueIndexRequest(word: string, docId: DocId) {
+    var indexRequest = new IndexRequest(word, docId);
+    const idx = nextBufferIndex();
+    buff$(idx) = indexRequest;
+    if (verbose) then writeln("enqueuing ", indexRequest);
   }
 
   proc haltIndexer() {

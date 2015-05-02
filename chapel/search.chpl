@@ -22,10 +22,11 @@ via repl:
 
 module Search {
   
-  use IO, Memory;
+  use IO, Memory, LockFreeHash, GenHashKey32;
 
   config const verbose = false;
   config const sync_writers = false;
+  config const entry_size = 1024*1024;
 
   type DocId = int(64);
 
@@ -34,13 +35,14 @@ module Search {
   class Entry {
     var word: string;
     var score: real; // TODO: may not be needed if we use docCount as frequency
-    var documentCount: atomic_int64;
+    var documentCount: atomic int;
     var documents: [0..8192-1] DocId;
   }
 
   class PartitionIndex {
-    var count: atomic_int64;
-    var entries: [0..(1024*1024/2)-1] Entry; // TODO: use a hashtable once the general approach is validated
+    var entryCount: atomic int;
+    var entryIndex = new LockFreeHash(int(32), entry_size);
+    var entries: [1..entry_size] Entry;
     var writerLock: atomicflag;
 
     inline proc lockIndexWriter() {
@@ -59,7 +61,6 @@ module Search {
   // number of dimensions in the partition space
   config var partitionDimensions = 16;
   var Partitions: [0..partitionDimensions-1] locale;
-
   var Indices: [0..Partitions.size-1] PartitionIndex;
 
   proc initPartitions() {
@@ -117,7 +118,9 @@ module Search {
           entry.documents[0] = docid;
           entry.documentCount.add(1);
 
-          partitionIndex.entries[entriesCount] = entry;
+          var entryIndex = partitionIndex.entryCount.add(1);
+          partitionIndex.entries[entryIndex] = entryIndex;
+          partitionIndex.entryIndex.setItem(genHashKey32(word), entryIndex);
           partitionIndex.count.add(1);
         }
       }
@@ -127,24 +130,19 @@ module Search {
   }
 
   proc indexContainsWord(word: string, partitionIndex: PartitionIndex): bool {
-    return entryIndexForWord(word, partitionIndex) != -1;
+    return entryIndexForWord(word, partitionIndex) != 0;
   }
 
   proc entryForWord(word: string, partitionIndex: PartitionIndex): Entry {
     var entryIndex = entryIndexForWord(word, partitionIndex);
-    if (entryIndex >= 0) {
+    if (entryIndex > 0) {
       return partitionIndex.entries[entryIndex];
     }
     return nil;
   }
 
   proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): int {
-    for i in 0..partitionIndex.count.read()-1 {
-      if (partitionIndex.entries[i].word == word) {
-        return i;
-      }
-    }
-    return -1;
+    return partitionIndex.entryIndex.getItem(genHashKey32(word));
   }
 
   proc dumpEntry(entry: Entry) {
@@ -175,7 +173,7 @@ module Search {
     var partitionIndex = Indices[partition];
     on partitionIndex {
       var entryIndex = entryIndexForWord(word, partitionIndex);
-      if (entryIndex >= 0) {
+      if (entryIndex > 0) {
         dumpEntry(partitionIndex.entries[entryIndex]);
       } else {
         writeln("word (", word, ") is not in the index");
