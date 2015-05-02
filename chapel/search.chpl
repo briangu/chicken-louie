@@ -26,9 +26,9 @@ module Search {
 
   config const verbose = false;
   config const sync_writers = false;
-  config const entry_size = 1024*1024;
+  config const entry_size: uint(32) = 1024*1024;
 
-  type DocId = int(64);
+  type DocId = uint(64);
 
   // for scoring and compactness purposes, consider making this use more contiguous memory,
   //  or an associative array(s) that use the score or docid as index.
@@ -36,12 +36,12 @@ module Search {
     var word: string;
     var score: real; // TODO: may not be needed if we use docCount as frequency
     var documentCount: atomic int;
-    var documents: [0..8192-1] DocId;
+    var documents: [0..8192-1] DocId; // TODO: point to the tail of a linked list; keep track of node + index into node
   }
 
   class PartitionIndex {
-    var entryCount: atomic int;
-    var entryIndex = new LockFreeHash(int(32), entry_size);
+    var entryCount: atomic uint(32);
+    var entryIndex = new LockFreeHash(uint(32), entry_size);
     var entries: [1..entry_size] Entry;
     var writerLock: atomicflag;
 
@@ -105,12 +105,13 @@ module Search {
           entry.documents[docCount] = docid;
           entry.documentCount.add(1);
         } else {
+          // TODO: append node to linked list of document ids
           if (verbose) then writeln("TODO: realloc documents");
         }
       } else {
         if (verbose) then writeln("adding new entry ", word , " on partition ", partition);
 
-        var entriesCount = partitionIndex.count.read();
+        var entriesCount = partitionIndex.entryCount.read();
         if (entriesCount < partitionIndex.entries.size) {
           entry = new Entry();
           entry.word = word;
@@ -118,10 +119,10 @@ module Search {
           entry.documents[0] = docid;
           entry.documentCount.add(1);
 
-          var entryIndex = partitionIndex.entryCount.add(1);
-          partitionIndex.entries[entryIndex] = entryIndex;
+          var entryIndex: uint(32) = partitionIndex.entryCount.fetchAdd(1);
+          partitionIndex.entries[entryIndex] = entry;
           partitionIndex.entryIndex.setItem(genHashKey32(word), entryIndex);
-          partitionIndex.count.add(1);
+//          partitionIndex.entryCount.add(1);
         }
       }
 
@@ -141,7 +142,7 @@ module Search {
     return nil;
   }
 
-  proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): int {
+  proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): uint(32) {
     return partitionIndex.entryIndex.getItem(genHashKey32(word));
   }
 
@@ -154,13 +155,13 @@ module Search {
     }
   }
 
-  proc dumpPartition(partition: DocId) {
+  proc dumpPartition(partition: int) {
     var partitionIndex = Indices[partition];
     on partitionIndex {
       writeln("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
 
       var word: string;
-      for i in 0..partitionIndex.count.read()-1 {
+      for i in 0..partitionIndex.entryCount.read()-1 {
         var entry = partitionIndex.entries[i];
         writeln("word: ", entry.word);
         dumpPostingTableForWord(entry.word);
