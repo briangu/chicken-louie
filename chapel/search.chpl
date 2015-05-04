@@ -122,7 +122,6 @@ module Search {
           var entryIndex: uint(32) = partitionIndex.entryCount.fetchAdd(1);
           partitionIndex.entries[entryIndex] = entry;
           partitionIndex.entryIndex.setItem(genHashKey32(word), entryIndex);
-//          partitionIndex.entryCount.add(1);
         }
       }
 
