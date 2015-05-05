@@ -2,6 +2,8 @@ module LockFreeHash {
   
   use GenHashKey32;
 
+  config const debug = false;
+
   // Lock Free Hash depends on a uint(32) key type.  To change this will requiring switching out the genHashKey algos (supply a class?)
   type KeyType = uint(32);
   type ValueType = uint(32);
@@ -30,48 +32,20 @@ module LockFreeHash {
 
     var array: [0..hashSize-1] TableEntry;
 
-/*
-void HashTable1::SetItem(uint32_t key, uint32_t value)
-{
-    for (uint32_t idx = integerHash(key);; idx++)
-    {
-        idx &= m_arraySize - 1;
-
-        // Load the key that was there.
-        uint32_t probedKey = mint_load_32_relaxed(&m_entries[idx].key);
-        if (probedKey != key)
-        {
-            // The entry was either free, or contains another key.
-            if (probedKey != 0)
-                continue;           // Usually, it contains another key. Keep probing.
-                
-            // The entry was free. Now let's try to take it using a CAS.
-            uint32_t prevKey = mint_compare_exchange_strong_32_relaxed(&m_entries[idx].key, 0, key);
-            if ((prevKey != 0) && (prevKey != key))
-                continue;       // Another thread just stole it from underneath us.
-
-            // Either we just added the key, or another thread did.
-        }
-        
-        // Store the value in this array entry.
-        mint_store_32_relaxed(&m_entries[idx].value, value);
-        return;
-    }
-}*/
     proc setItem(key: KeyType, value: ValueType): bool {
       var idx: uint(32) = genHashKey32(key);
       var count = 0;
       
-      writeln("key: ", key, " value: ", value);
-      writeln("count: ", count);
+      if (debug) then writeln("key: ", key, " value: ", value);
+      if (debug) then writeln("count: ", count);
 
       while (count < array.size) {
         idx &= hashSize - 1;
 
-        writeln("idx: ", idx);
+        if (debug) then writeln("idx: ", idx);
 
         var probedKey = array[idx].key.read();
-        writeln("probedKey: ", probedKey);
+        if (debug) then writeln("probedKey: ", probedKey);
         if (probedKey != key) {
           // The entry was either free, or contains another key.
           if (probedKey != 0) {
@@ -82,7 +56,7 @@ void HashTable1::SetItem(uint32_t key, uint32_t value)
 
           // The entry was free. Now let's try to take it using a CAS.
           var stored = array[idx].key.compareExchange(0, key);
-          writeln("stored: ", stored);
+          if (debug) then writeln("stored: ", stored);
           if (!stored) {
             idx += 1;
             count += 1;
@@ -99,56 +73,39 @@ void HashTable1::SetItem(uint32_t key, uint32_t value)
 
       if (count == array.size) {
         // out of capacity
-        writeln("hash out of capacity");
+        if (debug) then writeln("hash out of capacity");
       }
 
       return false;
     }
 
-/*
-uint32_t HashTable1::GetItem(uint32_t key)
-{
-    for (uint32_t idx = integerHash(key);; idx++)
-    {
-        idx &= m_arraySize - 1;
+    proc getItem(key: KeyType): ValueType {
+      var count = 0;
 
-        uint32_t probedKey = mint_load_32_relaxed(&m_entries[idx].key);
-        if (probedKey == key)
-            return mint_load_32_relaxed(&m_entries[idx].value);
-        if (probedKey == 0)
-            return 0;          
-    }
-}*/
-    proc getItem(key: KeyType, ref value: ValueType): bool {
-      var count = 0; // TODO: REMOVE
-
-      writeln("key: ", key);
-      writeln("count: ", count);
+      if (debug) then writeln("key: ", key);
+      if (debug) then writeln("count: ", count);
 
       var idx: uint(32) = genHashKey32(key);
       while (count < array.size) {
         idx &= hashSize - 1;
 
         var probedKey = array[idx].key.read();
-        writeln("probedKey: ", probedKey);
+        if (debug) then writeln("probedKey: ", probedKey);
         if (probedKey == key) {
-          value = array[idx].value.read();
-          return true;
+          return array[idx].value.read();
         }
         if (probedKey == 0) {
-          return false;
+          return 0;
         }
 
         count += 1;
-        writeln("count: ", count);
+        
+        if (debug) then writeln("count: ", count);
       }
 
-      // TODO: REMOVE
-      if (count == array.size) {
-        writeln("exhuastive search and key not found");
-      }
+      if (debug) then writeln("exhuastive search and key not found");
 
-      return false;
+      return 0;
     }
   }
 }

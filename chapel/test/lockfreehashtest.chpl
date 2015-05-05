@@ -7,8 +7,7 @@ proc storeItemTest(lfh: LockFreeHash, key: KeyType, value: ValueType) {
   writeln("success = ", success);
   writeln("attempting to get value with key ", key);
   var fetchedValue: ValueType;
-  success = lfh.getItem(key, fetchedValue);
-  writeln("success = ", success);
+  fetchedValue = lfh.getItem(key);
   writeln("value == fetchedValue\t", value == fetchedValue);
 }
 
@@ -35,9 +34,8 @@ proc basicParallel() {
   }
   writeln("\tcase2");
   coforall i in 1..d {
-    var fetchedValue: ValueType;
-    var success = lfh.getItem(i, fetchedValue);
-    if (!success) {
+    var fetchedValue = lfh.getItem(i);
+    if (!fetchedValue) {
       // writeln("success = ", success);
       writeln("failed key: ", i, " value: ", i, " fetchedValue: ", fetchedValue);
     }

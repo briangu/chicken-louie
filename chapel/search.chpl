@@ -41,7 +41,7 @@ module Search {
 
   class PartitionIndex {
     var entryCount: atomic uint(32);
-    var entryIndex = new LockFreeHash(uint(32), entry_size);
+    var entryIndex = new LockFreeHash(entry_size);
     var entries: [1..entry_size] Entry;
     var writerLock: atomicflag;
 
@@ -121,7 +121,11 @@ module Search {
 
           var entryIndex: uint(32) = partitionIndex.entryCount.fetchAdd(1);
           partitionIndex.entries[entryIndex] = entry;
-          partitionIndex.entryIndex.setItem(genHashKey32(word), entryIndex);
+          var success = partitionIndex.entryIndex.setItem(genHashKey32(word), entryIndex);
+          if (!success) {
+            writeln("failed to index ", word);
+            // how do we accumuate per-partition indexing errors for a final response?
+          }
         }
       }
 
@@ -142,7 +146,11 @@ module Search {
   }
 
   proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): uint(32) {
-    return partitionIndex.entryIndex.getItem(genHashKey32(word));
+    var value: uint(32) = partitionIndex.entryIndex.getItem(genHashKey32(word));
+    if (!value) {
+      writeln("failed to retrieve word ", word, " on partitionIndex ", partitionIndex);
+    }
+    return value;
   }
 
   proc dumpEntry(entry: Entry) {
