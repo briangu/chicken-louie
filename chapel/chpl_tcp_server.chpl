@@ -63,7 +63,7 @@ proc initIndex() {
     enqueueIndexRequest(word, 1);
   }
 
-  dumpPostingTableForWord("cat");
+//  dumpPostingTableForWord("cat");
 }
 
 proc writeLocInfo(loc: locale) {

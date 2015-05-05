@@ -1,5 +1,28 @@
 Feature notes:
 
+
+/*
+
+determine number of locales
+create map from hash to locale
+
+read a list of words
+for each word:
+  find hash
+  map hash to a locale
+  send word to mapped locale
+
+via repl:
+  ask for a word
+  find hash
+  map hash to a locale
+  get word info (e.g. count) from locale
+  print word info
+
+*/
+
+....
+
 Collision between ev_loop struct and function name:
 
 

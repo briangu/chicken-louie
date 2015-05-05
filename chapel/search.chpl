@@ -1,25 +1,5 @@
 // BUG: declaring use IO, Memory here causes chpl compiler segv
 
-/*
-
-determine number of locales
-create map from hash to locale
-
-read a list of words
-for each word:
-  find hash
-  map hash to a locale
-  send word to mapped locale
-
-via repl:
-  ask for a word
-  find hash
-  map hash to a locale
-  get word info (e.g. count) from locale
-  print word info
-
-*/
-
 module Search {
   
   use IO, Memory, LockFreeHash, GenHashKey32;
@@ -56,6 +36,10 @@ module Search {
       if (sync_writers) then writerLock.clear();
       // writeln("released lock");
     }
+
+    proc PartitionIndex() {
+      entryCount.add(1); // start at the first index of entries
+    }
   }
 
   // number of dimensions in the partition space
@@ -74,8 +58,6 @@ module Search {
         Indices[i] = new PartitionIndex();
       }
     }
-
-    writeln();
   }
 
   proc partitionForWord(word: string): int {
@@ -146,11 +128,7 @@ module Search {
   }
 
   proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): uint(32) {
-    var value: uint(32) = partitionIndex.entryIndex.getItem(genHashKey32(word));
-    if (!value) {
-      writeln("failed to retrieve word ", word, " on partitionIndex ", partitionIndex);
-    }
-    return value;
+    return partitionIndex.entryIndex.getItem(genHashKey32(word));
   }
 
   proc dumpEntry(entry: Entry) {
