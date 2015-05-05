@@ -73,13 +73,23 @@ module Search {
     return localeForPatition(hashFromWord(word));
   }
 
+  proc entryForWord(word: string): Entry {
+    var partition = partitionForWord(word);
+    var partitionIndex = Indices[partition];
+    var entry: Entry;
+    on partitionIndex {
+      entry = entryForWordOnPartition(word, partitionIndex);
+    }
+    return entry;
+  }
+
   proc indexWord(word: string, docid: DocId) {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
     on partitionIndex {
       partitionIndex.lockIndexWriter();
 
-      var entry = entryForWord(word, partitionIndex);
+      var entry = entryForWordOnPartition(word, partitionIndex);
       if (entry != nil) {
         if (verbose) then writeln("adding ", word, " to existing entries on partition ", partition);
         var docCount = entry.documentCount.read();
@@ -103,9 +113,10 @@ module Search {
 
           var entryIndex: uint(32) = partitionIndex.entryCount.fetchAdd(1);
           partitionIndex.entries[entryIndex] = entry;
-          var success = partitionIndex.entryIndex.setItem(genHashKey32(word), entryIndex);
+          var success = partitionIndex.entryIndex.setItem(word, entryIndex);
           if (!success) {
-            writeln("failed to index ", word);
+            writeln("indexWord: failed to index ", word);
+            exit(0);
             // how do we accumuate per-partition indexing errors for a final response?
           }
         }
@@ -119,7 +130,7 @@ module Search {
     return entryIndexForWord(word, partitionIndex) != 0;
   }
 
-  proc entryForWord(word: string, partitionIndex: PartitionIndex): Entry {
+  proc entryForWordOnPartition(word: string, partitionIndex: PartitionIndex): Entry {
     var entryIndex = entryIndexForWord(word, partitionIndex);
     if (entryIndex > 0) {
       return partitionIndex.entries[entryIndex];
@@ -128,7 +139,7 @@ module Search {
   }
 
   proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): uint(32) {
-    return partitionIndex.entryIndex.getItem(genHashKey32(word));
+    return partitionIndex.entryIndex.getItem(word);
   }
 
   proc dumpEntry(entry: Entry) {

@@ -8,11 +8,13 @@ module Indexer {
     var docId: DocId;
   }
 
-  config const buffersize = 1024;
+  config const buffersize = 2;
   config const verbose: bool = false;
+  config const testAfterIndex: bool = true;
 
   var buff$: [0..buffersize-1] sync IndexRequest;
   var bufferIndex: atomic int;
+  var release$: single bool;
 
   proc initIndexer() {
     bufferIndex.write(0);
@@ -36,27 +38,43 @@ module Indexer {
   proc enqueueIndexRequest(word: string, docId: DocId) {
     var indexRequest = new IndexRequest(word, docId);
     const idx = nextBufferIndex();
-    buff$(idx) = indexRequest;
+    buff$(idx).writeEF(indexRequest);
     if (verbose) then writeln("enqueuing ", indexRequest);
   }
 
-  proc haltIndexer() {
+  proc waitForIndexer() {
+    writeln("waiting...");
+    release$;
+    writeln("done waiting...");
+  }
+
+  proc markCompleteForIndexer() {
+    writeln("marking for completion");
     const idx = nextBufferIndex();
-    buff$(idx) = nil;
+    buff$(idx).writeEF(nil);
     if (verbose) then writeln("halting consumer");
   }
 
   proc consumer() {
     for indexRequest in readFromBuff() {
-      if (verbose) then writeln("Consumer got: ", indexRequest);
+      //if (verbose) then writeln("Consumer got: ", indexRequest);
+      write("Indexing: ", indexRequest, "...");
       indexWord(indexRequest.word, indexRequest.docId);
+      if (testAfterIndex) {
+        var entry = entryForWord(indexRequest.word);
+        if (entry == nil || entry.word != indexRequest.word) {
+          writeln("indexer: failed to index word ", indexRequest.word);
+          exit(0);
+        }
+      }
+      writeln();
       delete indexRequest;
     }
   }
 
   iter readFromBuff() {
-    var ind = 0,              
-        nextVal = buff$(0);
+    var ind = 0;
+    var nextVal = buff$(ind);
 
     while (nextVal != nil) {
       yield nextVal;
@@ -64,5 +82,7 @@ module Indexer {
       ind = (ind + 1) % buffersize;
       nextVal = buff$(ind);
     }
+
+    release$ = true;
   }
 }

@@ -99,4 +99,25 @@ coforall i in 1..1000 {
 }
 
 ....
+  // segv
+  iter readFromBuff() {
+    var ind = 0,              
+        nextVal = buff$(0);
+
+    while (nextVal != nil) {
+      yield nextVal;
+
+      ind = (ind + 1) % buffersize;
+      var state = buff$(ind).readXX();
+      if state != nil {
+        writeln("buff(", ind ,") = ", state);
+      } else {
+        writeln("buff(", ind ,") = ", "nil");
+      }
+      nextVal = buff$(ind);
+    }
+
+    release$ = true;
+  }
+
 

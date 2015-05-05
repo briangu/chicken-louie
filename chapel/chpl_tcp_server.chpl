@@ -63,6 +63,8 @@ proc initIndex() {
     enqueueIndexRequest(word, 1);
   }
 
+  markCompleteForIndexer();
+  waitForIndexer();
 //  dumpPostingTableForWord("cat");
 }
 
