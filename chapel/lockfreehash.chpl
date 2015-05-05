@@ -58,7 +58,7 @@ void HashTable1::SetItem(uint32_t key, uint32_t value)
         return;
     }
 }*/
-    proc setItem(key: KeyType, value: ValueType) {
+    proc setItem(key: KeyType, value: ValueType): bool {
       var idx: uint(32) = genHashKey32(key);
       var count = 0;
       
@@ -94,13 +94,15 @@ void HashTable1::SetItem(uint32_t key, uint32_t value)
 
         // Store the value in this array entry.
         array[idx].value.write(value);
-        return;
+        return true;
       }
 
       if (count == array.size) {
         // out of capacity
         writeln("hash out of capacity");
       }
+
+      return false;
     }
 
 /*
@@ -117,7 +119,7 @@ uint32_t HashTable1::GetItem(uint32_t key)
             return 0;          
     }
 }*/
-    proc getItem(key: KeyType): ValueType {
+    proc getItem(key: KeyType, ref value: ValueType): bool {
       var count = 0; // TODO: REMOVE
 
       writeln("key: ", key);
@@ -130,10 +132,11 @@ uint32_t HashTable1::GetItem(uint32_t key)
         var probedKey = array[idx].key.read();
         writeln("probedKey: ", probedKey);
         if (probedKey == key) {
-          return array[idx].value.read();
+          value = array[idx].value.read();
+          return true;
         }
         if (probedKey == 0) {
-          return 0;
+          return false;
         }
 
         count += 1;
@@ -145,7 +148,7 @@ uint32_t HashTable1::GetItem(uint32_t key)
         writeln("exhuastive search and key not found");
       }
 
-      return 0;
+      return false;
     }
   }
 }
