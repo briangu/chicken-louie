@@ -2,7 +2,7 @@
 
 module Search {
   
-  use IO, Memory, LockFreeHash, GenHashKey32;
+  use IO, Memory, LockFreeHash, GenHashKey32, Partitions;
 
   config const verbose = false;
   config const sync_writers = false;
@@ -42,35 +42,17 @@ module Search {
     }
   }
 
-  // number of dimensions in the partition space
-  config var partitionDimensions = 16;
-  var Partitions: [0..partitionDimensions-1] locale;
   var Indices: [0..Partitions.size-1] PartitionIndex;
 
-  proc initPartitions() {
-    // project the partitions down to the locales
+  proc initIndices() {
     for i in 0..Partitions.size-1 {
-      Partitions[i] = Locales[i % numLocales];
       on Partitions[i] {
-        writeln("partition[", i, "] is mapped to locale ", here.id);
+        writeln("index [", i, "] is mapped to partition ", i);
   
         // allocate the partition index on the partition locale
         Indices[i] = new PartitionIndex();
       }
     }
-  }
-
-  proc partitionForWord(word: string): int {
-    return 0;
-  }
-
-  proc localeForPartition(partition: DocId) {
-    if (verbose) then writeln("index: ", partition % Partitions.size);
-    return Partitions[partition % Partitions.size];
-  }
-
-  proc localeForWord(word: string): locale {
-    return localeForPatition(hashFromWord(word));
   }
 
   proc entryForWord(word: string): Entry {

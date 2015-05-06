@@ -11,7 +11,7 @@ tcp_server: tcp_server.o
 	$(CC) $(CFLAGS) -c -o tcp_server.o tcp_server.c
 
 chpl_tcp_server: tcp_server.o
-	chpl --devel --print-passes tcp_server.h tcp_server.o chapel/callbacks.h chapel/callbacks.c -I$(IDIR) -L$(LDIR) $(LIBS) -o chpl_tcp_server chapel/chpl_tcp_server.chpl chapel/search.chpl
+	chpl --devel --print-passes tcp_server.h tcp_server.o chapel/callbacks.h chapel/callbacks.c -I$(IDIR) -L$(LDIR) $(LIBS) -o chpl_tcp_server chapel/chpl_tcp_server.chpl
 
 c_tcp_server: tcp_server.o
 	$(CC) $(CFLAGS) -L$(LDIR) $(LIBS) -o c_tcp_server tcp_server.c c/tcp_server_main.c

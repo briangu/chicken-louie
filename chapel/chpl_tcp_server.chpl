@@ -1,4 +1,4 @@
-use LibEv, IO, Indexer, Search;
+use LibEv, IO, Indexer, Search, Partitions;
 
 // TODO: port to pure chapel
 extern proc initialize_socket(port: c_int): c_int;
@@ -43,6 +43,7 @@ proc initIndex() {
 	writeln();
 
 	initPartitions();
+  initIndices();
   initIndexer();
 
  //  writeln("adding 3 entries");
@@ -63,7 +64,6 @@ proc initIndex() {
     enqueueIndexRequest(word, 1);
   }
 
-  markCompleteForIndexer();
   waitForIndexer();
 //  dumpPostingTableForWord("cat");
 }
