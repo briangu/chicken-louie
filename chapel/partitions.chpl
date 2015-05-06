@@ -1,6 +1,6 @@
 module Partitions {
 
-  use GenHashKey32;
+  use Logging, GenHashKey32;
   
   // Number of dimensions in the partition space.
   // Each partition will be projected to a locale.  
@@ -17,7 +17,7 @@ module Partitions {
     for i in 0..Partitions.size-1 {
       Partitions[i] = Locales[i % numLocales];
       on Partitions[i] {
-        writeln("partition[", i, "] is mapped to locale ", here.id);
+        info("partition[", i, "] is mapped to locale ", here.id);
       }
     }
   }

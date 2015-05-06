@@ -1,4 +1,4 @@
-use Config, IO, Partitions;
+use Logging, IO, Partitions;
 
 class IndexRequest {
   var word: string;
@@ -38,7 +38,7 @@ class PartitionIndexer {
     writeln("enqueueIndexRequest ",word," start idx = ", idx);
     buff$(idx).writeEF(indexRequest);
     writeln("enqueueIndexRequest ",word," written idx = ", idx);
-    if (verbose) then writeln("enqueuing ", indexRequest);
+    info("enqueuing ", indexRequest);
   }
 
   proc waitForIndexer() {
@@ -53,7 +53,7 @@ class PartitionIndexer {
     writeln("markCompleteForIndexer start for idx = ", idx);
     buff$(idx).writeEF(nil);
     writeln("markCompleteForIndexer written for idx = ", idx);
-    if (verbose) then writeln("halting consumer");
+    info("halting consumer");
   }
 
   proc consumer() {
@@ -101,7 +101,7 @@ proc indexerForWord(word: string): PartitionIndexer {
 
 proc enqueueIndexRequest(word: string) {
   var indexRequest = new IndexRequest(word);
-  if (verbose) then writeln("enqueuing ", indexRequest);
+  info("enqueuing ", indexRequest);
   var indexer = indexerForWord(word);
   // TODO: do we need to go onto the indexer locale for this?  or will it just automatically be on that locale?
   // on indexer {
@@ -126,7 +126,7 @@ proc markCompleteForIndexer() {
       indexer.markCompleteForIndexer();
     // }
   }
-  if (verbose) then writeln("halting consumer");
+  info("halting consumer");
 }
 
 proc main() {

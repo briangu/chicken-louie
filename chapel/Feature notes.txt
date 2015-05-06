@@ -120,4 +120,48 @@ coforall i in 1..1000 {
     release$ = true;
   }
 
+...
+
+name collision not obvious
+
+module Logging {
+  
+  config const debug = false;
+  config const info = true;
+
+  proc debug(args ...?k) {
+    // if (debug) {
+    //   write(here.id, "\t");
+    //   writeln((...args));
+    // }
+  }
+
+  proc info(args ...?k) {
+    // if (info) {
+      // write(here.id, "\t");
+      // writeln((...args));
+    // }
+  }
+
+  proc error(args ...?k) {
+    // write(here.id, "\tERROR\t");
+    // writeln((...args));
+  }
+}
+
+use Logging;
+
+// proc info(args...?k) {
+//   writeln((...args));
+// }
+
+proc main() {
+  info("hello ", 1, " this is ", 2);
+
+  for i in 0..numLocales-1 {
+    on Locales[i] {
+      info("index [", i, "] is mapped to partition ", here.id);
+    }
+  }
+}
 

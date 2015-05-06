@@ -1,6 +1,6 @@
 module LockFreeHash {
   
-  use Config, GenHashKey32;
+  use Logging, GenHashKey32;
 
   // Lock Free Hash depends on a uint(32) key type.  To change this will requiring switching out the genHashKey algos (supply a class?)
   type KeyType = string;
@@ -37,16 +37,16 @@ module LockFreeHash {
       var idx: uint(32) = hashKey;
       var count = 0;
       
-      if (debug) then writeln("key: ", key, " value: ", value);
-      if (debug) then writeln("count: ", count);
+      debug("key: ", key, " value: ", value);
+      debug("count: ", count);
 
       while (count < array.size) {
         idx &= hashSize - 1;
 
-        if (debug) then writeln("idx: ", idx);
+        debug("idx: ", idx);
 
         var probedKey = array[idx].hashKey.read();
-        if (debug) then writeln("probedKey: ", probedKey);
+        debug("probedKey: ", probedKey);
         if (probedKey != hashKey || array[idx].key != key) {
           // The entry was either free, or contains another key.
           if (probedKey != 0) {
@@ -57,7 +57,7 @@ module LockFreeHash {
 
           // The entry was free. Now let's try to take it using a CAS.
           var stored = array[idx].hashKey.compareExchange(0, hashKey);
-          if (debug) then writeln("stored: ", stored);
+          debug("stored: ", stored);
           if (!stored) {
             idx += 1;
             count += 1;
@@ -76,7 +76,7 @@ module LockFreeHash {
 
       if (count == array.size) {
         // out of capacity
-        if (debug) then writeln("hash out of capacity");
+        error("hash out of capacity");
       }
 
       return false;
@@ -85,8 +85,8 @@ module LockFreeHash {
     proc getItem(key: KeyType): ValueType {
       var count = 0;
 
-      if (debug) then writeln("key: ", key);
-      if (debug) then writeln("count: ", count);
+      debug("key: ", key);
+      debug("count: ", count);
 
       var hashKey: uint(32) = genHashKey32(key);
       var idx: uint(32) = hashKey;
@@ -96,7 +96,7 @@ module LockFreeHash {
 
         var probedKey = array[idx].hashKey.read();
         if (probedKey == hashKey && array[idx].key == key) {
-          if (debug) then writeln("found match for hashKey");
+          debug("found match for hashKey");
           return array[idx].value.read();
         }
         if (probedKey == 0) {
@@ -106,10 +106,10 @@ module LockFreeHash {
         idx += 1;
         count += 1;
 
-        if (debug) then writeln("probedKey: ", probedKey, " count: ", count);
+        debug("probedKey: ", probedKey, " count: ", count);
       }
 
-      if (debug) then writeln("exhuastive search and key not found");
+      debug("exhuastive search and key not found");
 
       return 0;
     }

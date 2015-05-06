@@ -2,7 +2,7 @@
 
 module Search {
   
-  use Config, IO, Memory, LockFreeHash, GenHashKey32, Partitions;
+  use Logging, Memory, LockFreeHash, GenHashKey32, Partitions;
 
   config const sync_writers = false;
   config const entry_size: uint(32) = 1024*1024;
@@ -26,9 +26,9 @@ module Search {
     var writerLock: atomicflag;
 
     inline proc lockIndexWriter() {
-      // writeln("attempting to get lock");
+      // debug("attempting to get lock");
       if (sync_writers) then while writerLock.testAndSet() do chpl_task_yield();
-      // writeln("have lock");
+      // debug("have lock");
     }
 
     inline proc unlockIndexWriter() {
@@ -47,7 +47,7 @@ module Search {
   proc initIndices() {
     for i in 0..Partitions.size-1 {
       on Partitions[i] {
-        writeln("index [", i, "] is mapped to partition ", i);
+        info("index [", i, "] is mapped to partition ", i);
   
         // allocate the partition index on the partition locale
         Indices[i] = new PartitionIndex();
@@ -81,17 +81,17 @@ module Search {
 
       var entry = entryForWordOnPartition(word, partitionIndex);
       if (entry != nil) {
-        if (verbose) then writeln("adding ", word, " to existing entries on partition ", partition);
+        info("adding ", word, " to existing entries on partition ", partition);
         var docCount = entry.documentCount.read();
         if (docCount < entry.documents.size) {
           entry.documents[docCount] = docid;
           entry.documentCount.add(1);
         } else {
           // TODO: append node to linked list of document ids
-          if (verbose) then writeln("TODO: realloc documents");
+          info("TODO: realloc documents");
         }
       } else {
-        if (verbose) then writeln("adding new entry ", word , " on partition ", partition);
+        info("adding new entry ", word , " on partition ", partition);
 
         var entriesCount = partitionIndex.entryCount.read();
         if (entriesCount < partitionIndex.entries.size) {

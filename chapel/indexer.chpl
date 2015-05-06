@@ -1,6 +1,6 @@
 module Indexer {
 
-  use Config, Partitions, Search;
+  use Logging, Partitions, Search;
   
   class IndexRequest {
     var word: string;
@@ -41,35 +41,34 @@ module Indexer {
       var indexRequest = new IndexRequest(word, docId);
       const idx = nextBufferIndex();
       buff$(idx).writeEF(indexRequest);
-      if (verbose) then writeln("enqueuing ", indexRequest);
+      debug("enqueuing ", indexRequest);
     }
 
     proc waitForIndexer() {
-      writeln("waiting...");
+      debug("waiting...");
       release$;
-      writeln("done waiting...");
+      debug("done waiting...");
     }
 
     proc markCompleteForIndexer() {
-      writeln("marking for completion");
+      debug("marking for completion");
       const idx = nextBufferIndex();
       buff$(idx).writeEF(nil);
-      if (verbose) then writeln("halting consumer");
+      debug("halting consumer");
     }
 
     proc consumer() {
       for indexRequest in readFromBuff() {
-        //if (verbose) then writeln("Consumer got: ", indexRequest);
-        write("Indexing: ", indexRequest, "...");
+        info("Indexing: start ", indexRequest, "...");
         indexWord(indexRequest.word, indexRequest.docId);
         if (testAfterIndex) {
           var entry = entryForWord(indexRequest.word);
           if (entry == nil || entry.word != indexRequest.word) {
-            writeln("indexer: failed to index word ", indexRequest.word);
+            error("indexer: failed to index word ", indexRequest.word);
             exit(0);
           }
         }
-        writeln();
+        info("Indexing: complete ", indexRequest, "...");
         delete indexRequest;
       }
     }
@@ -106,7 +105,7 @@ module Indexer {
 
   proc enqueueIndexRequest(word: string, docId: DocId) {
     var indexRequest = new IndexRequest(word, docId);
-    if (verbose) then writeln("enqueuing ", indexRequest);
+    debug("enqueuing ", indexRequest);
     var indexer = indexerForWord(word);
     // TODO: do we need to go onto the indexer locale for this?  or will it just automatically be on that locale?
     on indexer {
@@ -116,24 +115,24 @@ module Indexer {
 
   proc waitForIndexer() {
     markCompleteForIndexer();
-    writeln("waiting...");
+    debug("waiting...");
     for indexer in indexers {
       // TODO: do we need to do this on the locale? or can we just call waitForIndexer and have it work?
       on indexer {
         indexer.waitForIndexer();
       }
     }
-    writeln("done waiting...");
+    debug("done waiting...");
   }
 
   proc markCompleteForIndexer() {
-    writeln("marking for completion");
+    debug("marking for completion");
     for indexer in indexers {
       // TODO: do we need to do this on the locale? or can we just call waitForIndexer and have it work?
       on indexer {
         indexer.markCompleteForIndexer();
       }
     }
-    if (verbose) then writeln("halting consumer");
+    debug("halting consumer");
   }
 }
