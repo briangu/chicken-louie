@@ -16,7 +16,7 @@ module Search {
     var word: string;
     var score: real; // TODO: may not be needed if we use docCount as frequency
     var documentCount: atomic int;
-    var documents: [0..8192-1] DocId; // TODO: point to the tail of a linked list; keep track of node + index into node
+    var documents: [0..256-1] DocId; // TODO: point to the tail of a linked list; keep track of node + index into node
   }
 
   class PartitionIndex {
@@ -81,17 +81,17 @@ module Search {
 
       var entry = entryForWordOnPartition(word, partitionIndex);
       if (entry != nil) {
-        info("adding ", word, " to existing entries on partition ", partition);
+        debug("adding ", word, " to existing entries on partition ", partition);
         var docCount = entry.documentCount.read();
         if (docCount < entry.documents.size) {
           entry.documents[docCount] = docid;
           entry.documentCount.add(1);
         } else {
           // TODO: append node to linked list of document ids
-          info("TODO: realloc documents");
+          // error("TODO: realloc documents for word: ", word);
         }
       } else {
-        info("adding new entry ", word , " on partition ", partition);
+        debug("adding new entry ", word , " on partition ", partition);
 
         var entriesCount = partitionIndex.entryCount.read();
         if (entriesCount < partitionIndex.entries.size) {
@@ -105,7 +105,7 @@ module Search {
           partitionIndex.entries[entryIndex] = entry;
           var success = partitionIndex.entryIndex.setItem(word, entryIndex);
           if (!success) {
-            writeln("indexWord: failed to index ", word);
+            error("indexWord: failed to index ", word);
             exit(0);
             // how do we accumuate per-partition indexing errors for a final response?
           }

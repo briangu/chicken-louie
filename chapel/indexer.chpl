@@ -59,7 +59,7 @@ module Indexer {
 
     proc consumer() {
       for indexRequest in readFromBuff() {
-        info("Indexing: start ", indexRequest, "...");
+        debug("Indexing: start ", indexRequest, "...");
         indexWord(indexRequest.word, indexRequest.docId);
         if (testAfterIndex) {
           var entry = entryForWord(indexRequest.word);
@@ -68,7 +68,7 @@ module Indexer {
             exit(0);
           }
         }
-        info("Indexing: complete ", indexRequest, "...");
+        debug("Indexing: complete ", indexRequest, "...");
         delete indexRequest;
       }
     }
