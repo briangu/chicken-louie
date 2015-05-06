@@ -1,8 +1,6 @@
 module LockFreeHash {
   
-  use GenHashKey32;
-
-  config const debug = false;
+  use Config, GenHashKey32;
 
   // Lock Free Hash depends on a uint(32) key type.  To change this will requiring switching out the genHashKey algos (supply a class?)
   type KeyType = string;

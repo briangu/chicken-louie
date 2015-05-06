@@ -1,14 +1,13 @@
 module Indexer {
 
-  use Search, Partitions;
+  use Config, Partitions, Search;
   
   class IndexRequest {
     var word: string;
     var docId: DocId;
   }
 
-  config const buffersize = 2;
-  config const verbose: bool = false;
+  config const buffersize = 1024;
   config const testAfterIndex: bool = true;
 
   class PartitionIndexer {
@@ -17,7 +16,8 @@ module Indexer {
     var release$: single bool;
 
     proc PartitionIndexer() {
-      bufferIndex.write(0);
+      // via nextBufferIndex, this is incremented to zero before first use
+      bufferIndex.write(-1);
     }
 
     proc startConsumer() {
@@ -100,17 +100,28 @@ module Indexer {
     }
   }
 
+  proc indexerForWord(word: string): PartitionIndexer {
+    return indexers[partitionForWord(word)];
+  }
+
   proc enqueueIndexRequest(word: string, docId: DocId) {
     var indexRequest = new IndexRequest(word, docId);
     if (verbose) then writeln("enqueuing ", indexRequest);
-    // find partition and use partion indexer
+    var indexer = indexerForWord(word);
+    // TODO: do we need to go onto the indexer locale for this?  or will it just automatically be on that locale?
+    on indexer {
+      indexer.enqueueIndexRequest(word);
+    }
   }
 
   proc waitForIndexer() {
     markCompleteForIndexer();
     writeln("waiting...");
     for indexer in indexers {
-      indexer.waitForIndexer();
+      // TODO: do we need to do this on the locale? or can we just call waitForIndexer and have it work?
+      on indexer {
+        indexer.waitForIndexer();
+      }
     }
     writeln("done waiting...");
   }
@@ -118,7 +129,10 @@ module Indexer {
   proc markCompleteForIndexer() {
     writeln("marking for completion");
     for indexer in indexers {
-      indexer.markCompleteForIndexer();
+      // TODO: do we need to do this on the locale? or can we just call waitForIndexer and have it work?
+      on indexer {
+        indexer.markCompleteForIndexer();
+      }
     }
     if (verbose) then writeln("halting consumer");
   }

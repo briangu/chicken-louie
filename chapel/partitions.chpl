@@ -1,9 +1,15 @@
 module Partitions {
-  
-  use GenHashKey32;
 
-    // number of dimensions in the partition space
+  use GenHashKey32;
+  
+  // Number of dimensions in the partition space.
+  // Each partition will be projected to a locale.  
+  // If the number of partitions exceeds the number of locales, 
+  // then the locales will be over-subscribed with possibly more than one
+  // partition per locale.
   config var partitionDimensions = 16;
+
+  // Partition to locale mapping.  Zero-based to allow modulo to work conveniently.
   var Partitions: [0..partitionDimensions-1] locale;
 
   proc initPartitions() {
@@ -16,15 +22,14 @@ module Partitions {
     }
   }
 
+  /**
+    Map a word to a partition.
+  */
   proc partitionForWord(word: string): int {
     return genHashKey32(word) % Partitions.size;
   }
 
-  proc localeForPartition(partition: int) {
-    return Partitions[partition % Partitions.size];
-  }
-
-  proc localeForWord(word: string): locale {
-    return localeForPartition(hashFromWord(word));
+  iter wordPartitions(word: string) {
+    yield genHashKey32(word) % Partitions.size;
   }
 }

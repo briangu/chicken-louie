@@ -2,12 +2,12 @@
 
 module Search {
   
-  use IO, Memory, LockFreeHash, GenHashKey32, Partitions;
+  use Config, IO, Memory, LockFreeHash, GenHashKey32, Partitions;
 
-  config const verbose = false;
   config const sync_writers = false;
   config const entry_size: uint(32) = 1024*1024;
 
+  // TODO: should be using a doc index that maps to a doc id?
   type DocId = uint(64);
 
   // for scoring and compactness purposes, consider making this use more contiguous memory,
@@ -55,6 +55,13 @@ module Search {
     }
   }
 
+  /**
+    Map a word to a partition.
+  */
+  proc partitionForWord(word: string): int {
+    return genHashKey32(word) % Partitions.size;
+  }
+
   proc entryForWord(word: string): Entry {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
@@ -63,6 +70,14 @@ module Search {
       entry = entryForWordOnPartition(word, partitionIndex);
     }
     return entry;
+  }
+
+  proc entryForWordOnPartition(word: string, partitionIndex: PartitionIndex): Entry {
+    var entryIndex = entryIndexForWord(word, partitionIndex);
+    if (entryIndex > 0) {
+      return partitionIndex.entries[entryIndex];
+    }
+    return nil;
   }
 
   proc indexWord(word: string, docid: DocId) {
@@ -110,14 +125,6 @@ module Search {
 
   proc indexContainsWord(word: string, partitionIndex: PartitionIndex): bool {
     return entryIndexForWord(word, partitionIndex) != 0;
-  }
-
-  proc entryForWordOnPartition(word: string, partitionIndex: PartitionIndex): Entry {
-    var entryIndex = entryIndexForWord(word, partitionIndex);
-    if (entryIndex > 0) {
-      return partitionIndex.entries[entryIndex];
-    }
-    return nil;
   }
 
   proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): uint(32) {
