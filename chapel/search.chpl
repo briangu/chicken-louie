@@ -55,13 +55,6 @@ module Search {
     }
   }
 
-  /**
-    Map a word to a partition.
-  */
-  proc partitionForWord(word: string): int {
-    return genHashKey32(word) % Partitions.size;
-  }
-
   proc entryForWord(word: string): Entry {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];

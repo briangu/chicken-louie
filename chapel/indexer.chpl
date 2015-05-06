@@ -110,7 +110,7 @@ module Indexer {
     var indexer = indexerForWord(word);
     // TODO: do we need to go onto the indexer locale for this?  or will it just automatically be on that locale?
     on indexer {
-      indexer.enqueueIndexRequest(word);
+      indexer.enqueueIndexRequest(word, docId);
     }
   }
 

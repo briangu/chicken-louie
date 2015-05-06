@@ -28,8 +28,4 @@ module Partitions {
   proc partitionForWord(word: string): int {
     return genHashKey32(word) % Partitions.size;
   }
-
-  iter wordPartitions(word: string) {
-    yield genHashKey32(word) % Partitions.size;
-  }
 }
