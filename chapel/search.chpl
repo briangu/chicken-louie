@@ -191,18 +191,10 @@ module Search {
   proc dumpEntry(entry: Entry) {
     on entry {
       info("word: ", entry.word, " score: ", entry.score);
-      var node = entry.documentIdNode;
       var count = 0;
-      while (node != nil) {
-        var startIdx = node.documents.size - node.documentCount.read();
-        for i in startIdx..node.documents.size-1 {
-          var docId = node.documents[i];
-          if (docId > 0) {
-            writeln("\t", docId);
-            count += 1;
-          }
-        }
-        node = node.next;
+      for docId in documentIdsForWord(entry.word) {
+        writeln("\t", docId);
+        count += 1;
       }
       if (count != entry.documentCount.read()) {
         error("ERROR: documentCount != count", count, entry.documentCount.read());
