@@ -6,17 +6,46 @@ module Search {
 
   config const sync_writers = false;
   config const entry_size: uint(32) = 1024*1024;
+  config const max_doc_node_size: uint(32) =  32 * 1024;
 
   // TODO: should be using a doc index that maps to a doc id?
   type DocId = uint(64);
+
+  /**
+    A documentId node 
+  */
+  class DocumentIdNode {
+    // controls the size of this document list
+    var listSize: int = 1;
+
+    var next: DocumentIdNode;
+
+    // list of documents
+    var documents: [0..listSize-1] DocId;
+
+    // number of documents in this node's list
+    var documentCount: atomic int;
+
+    proc nextDocumentIdNodeSize() {
+      if (documents.size >= max_doc_node_size) {
+        return documents.size;
+      } else {
+        return documents.size * 2;
+      }
+    }
+  }
 
   // for scoring and compactness purposes, consider making this use more contiguous memory,
   //  or an associative array(s) that use the score or docid as index.
   class Entry {
     var word: string;
+
     var score: real; // TODO: may not be needed if we use docCount as frequency
+    
+    // total number of documents in all the documentId nodes
     var documentCount: atomic int;
-    var documents: [0..256-1] DocId; // TODO: point to the tail of a linked list; keep track of node + index into node
+
+    var documentIdNode: DocumentIdNode;
   }
 
   class PartitionIndex {
@@ -82,14 +111,19 @@ module Search {
       var entry = entryForWordOnPartition(word, partitionIndex);
       if (entry != nil) {
         debug("adding ", word, " to existing entries on partition ", partition);
-        var docCount = entry.documentCount.read();
-        if (docCount < entry.documents.size) {
-          entry.documents[docCount] = docid;
-          entry.documentCount.add(1);
+        var docNode = entry.documentIdNode;
+        var docCount = docNode.documentCount.read();
+        if (docCount < docNode.documents.size) {
+          docNode.documents[docCount] = docid;
+          docNode.documentCount.add(1);
         } else {
-          // TODO: append node to linked list of document ids
-          // error("TODO: realloc documents for word: ", word);
+          var newDocNode = new DocumentIdNode(docNode.nextDocumentIdNodeSize(), docNode);
+          debug("adding new document id node of size ", newDocNode.documents.size);
+          newDocNode.documents[0] = docid;
+          newDocNode.documentCount.write(1);
+          entry.documentIdNode = newDocNode;
         }
+        entry.documentCount.add(1);
       } else {
         debug("adding new entry ", word , " on partition ", partition);
 
@@ -98,8 +132,12 @@ module Search {
           entry = new Entry();
           entry.word = word;
           entry.score = 0;        
-          entry.documents[0] = docid;
-          entry.documentCount.add(1);
+
+          var newDocNode = new DocumentIdNode();
+          newDocNode.documents[0] = docid;
+          newDocNode.documentCount.write(1);
+          entry.documentIdNode = newDocNode;
+          entry.documentCount.write(1);
 
           var entryIndex: uint(32) = partitionIndex.entryCount.fetchAdd(1);
           partitionIndex.entries[entryIndex] = entry;
@@ -127,8 +165,12 @@ module Search {
   proc dumpEntry(entry: Entry) {
     on entry {
       writeln("word: ", entry.word, " score: ", entry.score);
-      for i in 0..entry.documentCount.read()-1 {
-        writeln("\t", entry.documents[i]);
+      var node = entry.documentIdNode;
+      while (node != nil) {
+        for i in 0..node.documentCount.read()-1 {
+          writeln("\t", node.documents[i]);
+        }
+        node = node.next;
       }
     }
   }
