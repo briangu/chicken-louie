@@ -12,7 +12,9 @@ module Search {
   type DocId = uint(64);
 
   /**
-    A documentId node 
+    Document Ids are contained in a linked list, where each node is double the length of the previous node up to max_doc_node_size.
+    The linked list HEAD contains the most recently indexed items with the older document ids further down in the list.
+    In each node, document ids are added from right to left in the array.
   */
   class DocumentIdNode {
     // controls the size of this document list
@@ -26,7 +28,7 @@ module Search {
     // number of documents in this node's list
     var documentCount: atomic int;
 
-    // store the document ideas right to left in the array
+    // Gets the document id index to use to add a new document id.  documentCount should be incremented after using this index.
     proc documentIdIndex() {
       return documents.size - documentCount.read() - 1;
     }
@@ -167,6 +169,25 @@ module Search {
     return partitionIndex.entryIndex.getItem(word);
   }
 
+  iter documentIdsForWord(word: string) {
+    var entry = entryForWord(word);
+    if (entry != nil) {
+      on entry {
+        var node = entry.documentIdNode;
+        while (node != nil) {
+          var startIdx = node.documents.size - node.documentCount.read();
+          for i in startIdx..node.documents.size-1 {
+            var docId = node.documents[i];
+            if (docId > 0) {
+              yield docId;
+            }
+          }
+          node = node.next;
+        }
+      }
+    }
+  }
+
   proc dumpEntry(entry: Entry) {
     on entry {
       info("word: ", entry.word, " score: ", entry.score);
@@ -184,7 +205,7 @@ module Search {
         node = node.next;
       }
       if (count != entry.documentCount.read()) {
-        error("ERROR: documentCount != count");
+        error("ERROR: documentCount != count", count, entry.documentCount.read());
       }
     }
   }
@@ -204,15 +225,11 @@ module Search {
   }
 
   proc dumpPostingTableForWord(word: string) {
-    var partition = partitionForWord(word);
-    var partitionIndex = Indices[partition];
-    on partitionIndex {
-      var entryIndex = entryIndexForWord(word, partitionIndex);
-      if (entryIndex > 0) {
-        dumpEntry(partitionIndex.entries[entryIndex]);
-      } else {
-        entryIndexForWord("word (", word, ") is not in the index");
-      }
+    var entry = entryForWord(word);
+    if (entry != nil) {
+      dumpEntry(entry);
+    } else {
+      error("word (", word, ") is not in the index");
     }
   }
 }

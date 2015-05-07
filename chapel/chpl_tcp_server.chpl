@@ -63,11 +63,62 @@ proc initIndex() {
   var docId: DocId = 1;
   while (reader.readln(word)) {
     enqueueIndexRequest(word, docId);
-    docId += 1;
+    docId = (docId + 1) % 1000 + 1; // fake different docs
   }
 
   waitForIndexer();
+
   dumpPostingTableForWord("the");
+
+  // TODO: build execution Tree w/ conj / disj. (operator) nodes
+  // test basic boolean operators
+  writeln("conjunction");
+  var conj = conjunction(["the", "dog"]);
+  writeln(conj);
+
+  writeln("disjunction");
+  var disj = disjunction(["the", "dog"]);
+  writeln(disj);
+}
+
+proc conjunction(words: [] string): domain(DocId) {
+  writeln("finding conjunction of: ", words);
+  var doms: [1..words.size] domain(DocId);
+  
+  for j in 1..words.size {
+    var word = words[j];
+    for docId in documentIdsForWord(word) {
+      doms[j] += docId;
+    }
+  }
+
+  writeln("applying intersection");
+
+  for j in 2..words.size {
+    doms[1] = doms[1] & doms[j];
+  }
+
+  return doms[1];
+}
+
+proc disjunction(words: [] string): domain(DocId) {
+  writeln("finding disjunction of: ", words);
+  var doms: [1..words.size] domain(DocId);
+  
+  for j in 1..words.size {
+    var word = words[j];
+    for docId in documentIdsForWord(word) {
+      doms[j] += docId;
+    }
+  }
+
+  writeln("applying disjunction");
+
+  for j in 2..words.size {
+    doms[1] = doms[1] | doms[j];
+  }
+
+  return doms[1];
 }
 
 proc writeLocInfo(loc: locale) {
