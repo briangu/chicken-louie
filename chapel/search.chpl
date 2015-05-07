@@ -26,6 +26,11 @@ module Search {
     // number of documents in this node's list
     var documentCount: atomic int;
 
+    // store the document ideas right to left in the array
+    proc documentIdIndex() {
+      return documents.size - documentCount.read() - 1;
+    }
+
     proc nextDocumentIdNodeSize() {
       if (documents.size >= max_doc_node_size) {
         return documents.size;
@@ -114,14 +119,14 @@ module Search {
         var docNode = entry.documentIdNode;
         var docCount = docNode.documentCount.read();
         if (docCount < docNode.documents.size) {
-          docNode.documents[docCount] = docid;
+          docNode.documents[docNode.documentIdIndex()] = docid;
           docNode.documentCount.add(1);
         } else {
-          var newDocNode = new DocumentIdNode(docNode.nextDocumentIdNodeSize(), docNode);
-          debug("adding new document id node of size ", newDocNode.documents.size);
-          newDocNode.documents[0] = docid;
-          newDocNode.documentCount.write(1);
-          entry.documentIdNode = newDocNode;
+          docNode = new DocumentIdNode(docNode.nextDocumentIdNodeSize(), docNode);
+          debug("adding new document id node of size ", docNode.documents.size);
+          docNode.documents[docNode.documentIdIndex()] = docid;
+          docNode.documentCount.write(1);
+          entry.documentIdNode = docNode;
         }
         entry.documentCount.add(1);
       } else {
@@ -133,10 +138,10 @@ module Search {
           entry.word = word;
           entry.score = 0;        
 
-          var newDocNode = new DocumentIdNode();
-          newDocNode.documents[0] = docid;
-          newDocNode.documentCount.write(1);
-          entry.documentIdNode = newDocNode;
+          var docNode = new DocumentIdNode();
+          docNode.documents[docNode.documentIdIndex()] = docid;
+          docNode.documentCount.write(1);
+          entry.documentIdNode = docNode;
           entry.documentCount.write(1);
 
           var entryIndex: uint(32) = partitionIndex.entryCount.fetchAdd(1);
@@ -164,13 +169,22 @@ module Search {
 
   proc dumpEntry(entry: Entry) {
     on entry {
-      writeln("word: ", entry.word, " score: ", entry.score);
+      info("word: ", entry.word, " score: ", entry.score);
       var node = entry.documentIdNode;
+      var count = 0;
       while (node != nil) {
-        for i in 0..node.documentCount.read()-1 {
-          writeln("\t", node.documents[i]);
+        var startIdx = node.documents.size - node.documentCount.read();
+        for i in startIdx..node.documents.size-1 {
+          var docId = node.documents[i];
+          if (docId > 0) {
+            writeln("\t", docId);
+            count += 1;
+          }
         }
         node = node.next;
+      }
+      if (count != entry.documentCount.read()) {
+        error("ERROR: documentCount != count");
       }
     }
   }
@@ -178,12 +192,12 @@ module Search {
   proc dumpPartition(partition: int) {
     var partitionIndex = Indices[partition];
     on partitionIndex {
-      writeln("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
+      info("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
 
       var word: string;
       for i in 0..partitionIndex.entryCount.read()-1 {
         var entry = partitionIndex.entries[i];
-        writeln("word: ", entry.word);
+        info("word: ", entry.word);
         dumpPostingTableForWord(entry.word);
       }
     }
@@ -197,7 +211,7 @@ module Search {
       if (entryIndex > 0) {
         dumpEntry(partitionIndex.entries[entryIndex]);
       } else {
-        writeln("word (", word, ") is not in the index");
+        entryIndexForWord("word (", word, ") is not in the index");
       }
     }
   }

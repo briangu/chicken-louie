@@ -60,12 +60,14 @@ proc initIndex() {
   var infile = open("words.txt", iomode.r);
   var reader = infile.reader();
   var word: string;
+  var docId: DocId = 1;
   while (reader.readln(word)) {
-    enqueueIndexRequest(word, 1);
+    enqueueIndexRequest(word, docId);
+    docId += 1;
   }
 
   waitForIndexer();
-//  dumpPostingTableForWord("cat");
+  dumpPostingTableForWord("the");
 }
 
 proc writeLocInfo(loc: locale) {
