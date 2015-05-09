@@ -1,4 +1,4 @@
-use Logging, LibEv, IO, Indexer, Search, Partitions;
+use Logging, Memory, LibEv, IO, Indexer, Search, Partitions;
 
 // TODO: port to pure chapel
 extern proc initialize_socket(port: c_int): c_int;
@@ -87,8 +87,11 @@ proc conjunction(words: [] string): domain(DocId) {
   
   for j in 1..words.size {
     var word = words[j];
-    for docId in documentIdsForWord(word) {
-      doms[j] += docId;
+    var entry = entryForWord(word);
+    on entry {
+      for docId in documentIdsForEntry(entry) {
+        doms[j] += docId;
+      }
     }
   }
 
@@ -107,8 +110,11 @@ proc disjunction(words: [] string): domain(DocId) {
   
   for j in 1..words.size {
     var word = words[j];
-    for docId in documentIdsForWord(word) {
-      doms[j] += docId;
+    var entry = entryForWord(word);
+    on entry {
+      for docId in documentIdsForEntry(entry) {
+        doms[j] += docId;
+      }
     }
   }
 
@@ -131,7 +137,7 @@ proc writeLocInfo(loc: locale) {
   }
 }
 
-proc main(): c_long {
+proc main() {
 
 	// writeln("creating socket...");
 	// var sd: ev_fd = initialize_socket(port);
@@ -154,6 +160,4 @@ proc main(): c_long {
 	// while (1) {
 	// 	ev_loop_fn(EV_DEFAULT, 0);
 	// }
-
-	return 0;
 }

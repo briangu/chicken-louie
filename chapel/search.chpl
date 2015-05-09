@@ -169,30 +169,46 @@ module Search {
     return partitionIndex.entryIndex.getItem(word);
   }
 
-  iter documentIdsForWord(word: string) {
-    var entry = entryForWord(word);
-    if (entry != nil) {
-      on entry {
-        var node = entry.documentIdNode;
-        while (node != nil) {
-          var startIdx = node.documents.size - node.documentCount.read();
-          for i in startIdx..node.documents.size-1 {
-            var docId = node.documents[i];
-            if (docId > 0) {
-              yield docId;
-            }
-          }
-          node = node.next;
+  iter documentIdsForEntry(entry: Entry) {
+    var node = entry.documentIdNode;
+    while (node != nil) {
+      var startIdx = node.documents.size - node.documentCount.read();
+      for i in startIdx..node.documents.size-1 {
+        var docId = node.documents[i];
+        if (docId > 0) {
+          yield docId;
         }
       }
+      node = node.next;
     }
   }
+
+  // can't yield inside on in 1.11.0
+  // 
+  // iter documentIdsForWord(word: string) {
+  //   var entry = entryForWord(word);
+  //   if (entry != nil) {
+  //     on entry {
+  //       var node = entry.documentIdNode;
+  //       while (node != nil) {
+  //         var startIdx = node.documents.size - node.documentCount.read();
+  //         for i in startIdx..node.documents.size-1 {
+  //           var docId = node.documents[i];
+  //           if (docId > 0) {
+  //             yield docId;
+  //           }
+  //         }
+  //         node = node.next;
+  //       }
+  //     }
+  //   }
+  // }
 
   proc dumpEntry(entry: Entry) {
     on entry {
       info("word: ", entry.word, " score: ", entry.score);
       var count = 0;
-      for docId in documentIdsForWord(entry.word) {
+      for docId in documentIdsForEntry(entry) {
         writeln("\t", docId);
         count += 1;
       }
