@@ -46,7 +46,7 @@ proc initIndex() {
   initPartitions();
   initIndices();
 
-  initIndexer();
+  // initIndexer();
 
  //  writeln("adding 3 entries");
 	// indexWord("dog", 1);
@@ -66,11 +66,12 @@ proc initIndex() {
   var word: string;
   var docId: DocId = 1;
   while (reader.readln(word)) {
-    enqueueIndexRequest(word, docId);
+//    enqueueIndexRequest(word, docId);
+    indexWord(word, docId);
     docId = (docId + 1) % 1000 + 1; // fake different docs
   }
 
-  waitForIndexer();
+//  waitForIndexer();
   t.stop();
   timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 
@@ -79,13 +80,19 @@ proc initIndex() {
 
   // TODO: build execution Tree w/ conj / disj. (operator) nodes
   // test basic boolean operators
-  writeln("conjunction");
-  var conj = conjunction(["the", "dog"]);
-  writeln(conj);
+  // writeln("conjunction");
+  // t.start();
+  // var conj = conjunction(["the", "dog"]);
+  // t.stop();
+  // timing("conjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+  // writeln(conj);
 
-  writeln("disjunction");
-  var disj = disjunction(["the", "dog"]);
-  writeln(disj);
+  // writeln("disjunction");
+  // t.start();
+  // var disj = disjunction(["the", "dog"]);
+  // t.stop();
+  // timing("disjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+  // writeln(disj);
 }
 
 proc conjunction(words: [] string): domain(DocId) {
