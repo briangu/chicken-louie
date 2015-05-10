@@ -45,8 +45,8 @@ proc initIndex() {
   initPartitions();
   initIndices();
 
-// temporarily disable indexer
-//  initIndexer();
+
+  initIndexer();
 
  //  writeln("adding 3 entries");
 	// indexWord("dog", 1);
@@ -64,12 +64,11 @@ proc initIndex() {
   var word: string;
   var docId: DocId = 1;
   while (reader.readln(word)) {
-    //enqueueIndexRequest(word, docId);
-    indexWord(word, docId);
+    enqueueIndexRequest(word, docId);
     docId = (docId + 1) % 1000 + 1; // fake different docs
   }
 
-  //waitForIndexer();
+  waitForIndexer();
 
   dumpPostingTableForWord("the");
 
