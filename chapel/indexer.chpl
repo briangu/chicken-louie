@@ -1,6 +1,6 @@
 module Indexer {
 
-  use Logging, Partitions, Search;
+  use Logging, Partitions, Search, Time;
   
   config const buffersize = 1024;
   config const testAfterIndex: bool = true;
@@ -11,6 +11,7 @@ module Indexer {
     var buff$: [0..buffersize-1] sync IndexRequest;
     var bufferIndex: atomic int;
     var release$: single bool;
+    var t: Timer;
 
     proc PartitionIndexer() {
       partition = 0;
@@ -62,8 +63,13 @@ module Indexer {
     }
 
     proc flushBatch(batch: [] IndexRequest, batchCount: int) {
+      t.start();
       debug("flushing batch");
       indexWordsOnPartition(batch, batchCount, partition);
+      t.stop();
+      timing("flushed ", batchCount," batch in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+
+      t.start();
       for i in 0..batchCount-1 {
         if (testAfterIndex) {
           var entry = entryForWord(batch[i].word);
@@ -74,7 +80,8 @@ module Indexer {
         }
         delete batch[i];
       }
-      debug("finished flushing batch");
+      t.stop();
+      timing("test fetch in ",t.elapsed(TimeUnits.microseconds), " microseconds");
     }
 
     proc consumer() {

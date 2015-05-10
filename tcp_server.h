@@ -3,7 +3,7 @@
 void plog(const char *format, ...);
 
 // start the tcp server
-int start();
+int startServer();
 
 int initialize_socket(int port);
 void accept_cb(struct ev_loop *loop, struct ev_io *watcher, int revents);
