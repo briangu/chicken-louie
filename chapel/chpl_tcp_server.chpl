@@ -90,9 +90,11 @@ proc conjunction(words: [] string): domain(DocId) {
   for j in 1..words.size {
     var word = words[j];
     var entry = entryForWord(word);
-    on entry {
-      for docId in documentIdsForEntry(entry) {
-        doms[j] += docId;
+    if (entry != nil) {
+      on entry {
+        for docId in documentIdsForEntry(entry) {
+          doms[j] += docId;
+        }
       }
     }
   }
@@ -113,9 +115,11 @@ proc disjunction(words: [] string): domain(DocId) {
   for j in 1..words.size {
     var word = words[j];
     var entry = entryForWord(word);
-    on entry {
-      for docId in documentIdsForEntry(entry) {
-        doms[j] += docId;
+    if (entry != nil) {
+      on entry {
+        for docId in documentIdsForEntry(entry) {
+          doms[j] += docId;
+        }
       }
     }
   }
