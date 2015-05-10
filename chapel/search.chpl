@@ -2,7 +2,7 @@
 
 module Search {
   
-  use Logging, Memory, LockFreeHash, GenHashKey32, Partitions;
+  use Logging, Memory, LockFreeHash, GenHashKey32, Partitions, Time;
 
   config const sync_writers = false;
   config const entry_size: uint(32) = 1024*1024;
@@ -93,6 +93,8 @@ module Search {
   var Indices: [0..Partitions.size-1] PartitionIndex;
 
   proc initIndices() {
+    var t: Timer;
+    t.start();
     for i in 0..Partitions.size-1 {
       on Partitions[i] {
         info("index [", i, "] is mapped to partition ", i);
@@ -101,6 +103,8 @@ module Search {
         Indices[i] = new PartitionIndex(i);
       }
     }
+    t.stop();
+    timing("initialized indices in ",t.elapsed(TimeUnits.microseconds), " microseconds");
   }
 
   proc entryForWord(word: string): Entry {

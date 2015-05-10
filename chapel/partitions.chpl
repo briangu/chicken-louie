@@ -1,6 +1,6 @@
 module Partitions {
 
-  use Logging, GenHashKey32;
+  use Logging, GenHashKey32, Time;
   
   // Number of dimensions in the partition space.
   // Each partition will be projected to a locale.  
@@ -13,13 +13,18 @@ module Partitions {
   var Partitions: [0..partitionDimensions-1] locale;
 
   proc initPartitions() {
+    var t: Timer;
+    t.start();
     // project the partitions down to the locales
+
     for i in 0..Partitions.size-1 {
       Partitions[i] = Locales[i % numLocales];
       on Partitions[i] {
         info("partition[", i, "] is mapped to locale ", here.id);
       }
     }
+    t.stop();
+    timing("initialized partitions in ",t.elapsed(TimeUnits.microseconds), " microseconds");
   }
 
   /**

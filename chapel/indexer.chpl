@@ -122,12 +122,16 @@ module Indexer {
   var indexers: [0..Partitions.size-1] PartitionIndexer;
 
   proc initIndexer() {
+    var t: Timer;
+    t.start();
     for i in 0..Partitions.size-1 {
       on Partitions[i] {
         indexers[i] = new PartitionIndexer(i);
         indexers[i].startConsumer();
       }
     }
+    t.stop();
+    timing("initialized indexer in ",t.elapsed(TimeUnits.microseconds), " microseconds");
   }
 
   proc indexerForWord(word: string): PartitionIndexer {

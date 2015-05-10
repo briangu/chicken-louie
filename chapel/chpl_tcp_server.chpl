@@ -1,4 +1,4 @@
-use Logging, Memory, LibEv, IO, Indexer, Search, Partitions;
+use Logging, Memory, LibEv, IO, Indexer, Search, Partitions, Time;
 
 // TODO: port to pure chapel
 extern proc initialize_socket(port: c_int): c_int;
@@ -42,9 +42,9 @@ proc initIndex() {
 	writeln("It began running on locale #", here.id);
 	writeln();
 
+
   initPartitions();
   initIndices();
-
 
   initIndexer();
 
@@ -58,6 +58,8 @@ proc initIndex() {
 
  //  writeln("dumping posting table for word: cat");
 	// dumpPostingTableForWord("cat");
+  var t: Timer;
+  t.start();
 
   var infile = open("words.txt", iomode.r);
   var reader = infile.reader();
@@ -69,8 +71,11 @@ proc initIndex() {
   }
 
   waitForIndexer();
+  t.stop();
+  timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 
-  dumpPostingTableForWord("the");
+
+  //dumpPostingTableForWord("the");
 
   // TODO: build execution Tree w/ conj / disj. (operator) nodes
   // test basic boolean operators
