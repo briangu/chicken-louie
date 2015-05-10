@@ -2,20 +2,24 @@ module Indexer {
 
   use Logging, Partitions, Search;
   
-  class IndexRequest {
-    var word: string;
-    var docId: DocId;
-  }
-
   config const buffersize = 1024;
   config const testAfterIndex: bool = true;
+  config const batchSize = 128;
 
   class PartitionIndexer {
+    var partition: int;
     var buff$: [0..buffersize-1] sync IndexRequest;
     var bufferIndex: atomic int;
     var release$: single bool;
 
     proc PartitionIndexer() {
+      partition = 0;
+      // via nextBufferIndex, this is incremented to zero before first use
+      bufferIndex.write(-1);
+    }
+
+    proc PartitionIndexer(idx: int) {
+      partition = idx;
       // via nextBufferIndex, this is incremented to zero before first use
       bufferIndex.write(-1);
     }
@@ -57,19 +61,39 @@ module Indexer {
       debug("halting consumer");
     }
 
-    proc consumer() {
-      for indexRequest in readFromBuff() {
-        debug("Indexing: start ", indexRequest, "...");
-        indexWord(indexRequest.word, indexRequest.docId);
+    proc flushBatch(batch: [] IndexRequest, batchCount: int) {
+      debug("flushing batch");
+      indexWordsOnPartition(batch, batchCount, partition);
+      for i in 0..batchCount-1 {
         if (testAfterIndex) {
-          var entry = entryForWord(indexRequest.word);
-          if (entry == nil || entry.word != indexRequest.word) {
-            error("indexer: failed to index word ", indexRequest.word);
+          var entry = entryForWord(batch[i].word);
+          if (entry == nil || entry.word != batch[i].word) {
+            error("indexer: failed to index word ", batch[i].word);
             exit(0);
           }
         }
-        debug("Indexing: complete ", indexRequest, "...");
-        delete indexRequest;
+        delete batch[i];
+      }
+      debug("finished flushing batch");
+    }
+
+    proc consumer() {
+      var batch: [0..batchSize-1] IndexRequest;
+      var batchCount = 0;
+
+      for indexRequest in readFromBuff() {
+        debug("adding ", indexRequest, " to batch");
+        batch[batchCount] = indexRequest;
+        batchCount += 1;
+
+        if (batchCount == batch.size) {
+          flushBatch(batch, batchCount);
+          batchCount = 0;
+        }
+      }
+
+      if (batchCount > 0) {
+        flushBatch(batch, batchCount);
       }
     }
 
@@ -93,7 +117,7 @@ module Indexer {
   proc initIndexer() {
     for i in 0..Partitions.size-1 {
       on Partitions[i] {
-        indexers[i] = new PartitionIndexer();
+        indexers[i] = new PartitionIndexer(i);
         indexers[i].startConsumer();
       }
     }

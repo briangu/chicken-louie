@@ -7,7 +7,7 @@ module Partitions {
   // If the number of partitions exceeds the number of locales, 
   // then the locales will be over-subscribed with possibly more than one
   // partition per locale.
-  config var partitionDimensions = 16;
+  config var partitionDimensions = 16; //Locales.size;
 
   // Partition to locale mapping.  Zero-based to allow modulo to work conveniently.
   var Partitions: [0..partitionDimensions-1] locale;

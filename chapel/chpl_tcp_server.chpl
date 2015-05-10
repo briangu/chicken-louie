@@ -42,8 +42,10 @@ proc initIndex() {
 	writeln("It began running on locale #", here.id);
 	writeln();
 
-	initPartitions();
+  initPartitions();
   initIndices();
+
+
   initIndexer();
 
  //  writeln("adding 3 entries");
@@ -147,8 +149,8 @@ proc main() {
 	// 	return -1;
 	// }
 
-	writeln("initializing index");
-	initIndex();
+  writeln("initializing index");
+  initIndex();
 
 	// writeln("initializing event loop...");
 
