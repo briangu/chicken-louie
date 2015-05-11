@@ -9,6 +9,7 @@ extern var c_accept_cb: opaque;
 extern proc send(sockfd:c_int, buffer: c_string, len: size_t, flags: c_int);
 
 config var port: c_int = 3033;
+config var postTest: bool = false;
 
 // TODO: we need to know which client context this is so that we can maintain parsing context
 //       is the fd enough?
@@ -75,24 +76,25 @@ proc initIndex() {
   t.stop();
   timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 
+  if () {
+    dumpPostingTableForWord("the");
 
-  //dumpPostingTableForWord("the");
+    // TODO: build execution Tree w/ conj / disj. (operator) nodes
+    // test basic boolean operators
+    writeln("conjunction");
+    t.start();
+    var conj = conjunction(["the", "dog"]);
+    t.stop();
+    timing("conjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+    writeln(conj);
 
-  // TODO: build execution Tree w/ conj / disj. (operator) nodes
-  // test basic boolean operators
-  // writeln("conjunction");
-  // t.start();
-  // var conj = conjunction(["the", "dog"]);
-  // t.stop();
-  // timing("conjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
-  // writeln(conj);
-
-  // writeln("disjunction");
-  // t.start();
-  // var disj = disjunction(["the", "dog"]);
-  // t.stop();
-  // timing("disjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
-  // writeln(disj);
+    writeln("disjunction");
+    t.start();
+    var disj = disjunction(["the", "dog"]);
+    t.stop();
+    timing("disjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+    writeln(disj);
+  }
 }
 
 proc conjunction(words: [] string): domain(DocId) {

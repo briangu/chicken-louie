@@ -4,6 +4,31 @@ warning: --specialize was set, but CHPL_TARGET_ARCH is 'unknown'. If you want an
 
 ....
 
+
+  // can't yield inside on in 1.11.0
+  // 
+  // iter documentIdsForWord(word: string) {
+  //   var entry = entryForWord(word);
+  //   if (entry != nil) {
+  //     on entry {
+  //       var node = entry.documentIdNode;
+  //       while (node != nil) {
+  //         var startIdx = node.documents.size - node.documentCount.read();
+  //         for i in startIdx..node.documents.size-1 {
+  //           var docId = node.documents[i];
+  //           if (docId > 0) {
+  //             yield docId;
+  //           }
+  //         }
+  //         node = node.next;
+  //       }
+  //     }
+  //   }
+  // }
+
+
+....
+
 /*
 
 determine number of locales
