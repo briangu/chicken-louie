@@ -142,20 +142,14 @@ module Indexer {
     var indexRequest = new IndexRequest(word, docId);
     debug("enqueuing ", indexRequest);
     var indexer = indexerForWord(word);
-    // TODO: do we need to go onto the indexer locale for this?  or will it just automatically be on that locale?
-    on indexer {
-      indexer.enqueueIndexRequest(word, docId);
-    }
+    indexer.enqueueIndexRequest(word, docId);
   }
 
   proc waitForIndexer() {
     markCompleteForIndexer();
     debug("waiting...");
     for indexer in indexers {
-      // TODO: do we need to do this on the locale? or can we just call waitForIndexer and have it work?
-      on indexer {
-        indexer.waitForIndexer();
-      }
+      indexer.waitForIndexer();
     }
     debug("done waiting...");
   }
@@ -163,10 +157,7 @@ module Indexer {
   proc markCompleteForIndexer() {
     debug("marking for completion");
     for indexer in indexers {
-      // TODO: do we need to do this on the locale? or can we just call waitForIndexer and have it work?
-      on indexer {
-        indexer.markCompleteForIndexer();
-      }
+      indexer.markCompleteForIndexer();
     }
     debug("halting consumer");
   }

@@ -5,7 +5,7 @@ module Search {
   use Logging, Memory, LockFreeHash, GenHashKey32, Partitions, Time;
 
   config const sync_writers = false;
-  config const entry_size: uint(32) = 1024*1024;
+  config const entry_size: uint(32) = 1024 * 128; // TODO: implement segments and flush segment when the entries are filled
   config const max_doc_node_size: uint(32) =  32 * 1024;
 
   // TODO: should be using a doc index that maps to a doc id?
@@ -65,19 +65,6 @@ module Search {
     var entryCount: atomic uint(32);
     var entryIndex = new LockFreeHash(entry_size);
     var entries: [1..entry_size] Entry;
-    var writerLock: atomicflag;
-
-    inline proc lockIndexWriter() {
-      // debug("attempting to get lock");
-      if (sync_writers) then while writerLock.testAndSet() do chpl_task_yield();
-      // debug("have lock");
-    }
-
-    inline proc unlockIndexWriter() {
-      // writeln("releasing lock");
-      if (sync_writers) then writerLock.clear();
-      // writeln("released lock");
-    }
 
     proc PartitionIndex() {
       partition = 0;
@@ -110,10 +97,7 @@ module Search {
   proc entryForWord(word: string): Entry {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
-    var entry: Entry;
-    on partitionIndex {
-      entry = entryForWordOnPartition(word, partitionIndex);
-    }
+    var entry = entryForWordOnPartition(word, partitionIndex);
     return entry;
   }
 
@@ -128,25 +112,13 @@ module Search {
   proc indexWord(word: string, docId: DocId) {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
-    on partitionIndex {
-      partitionIndex.lockIndexWriter();
-
-      indexWordOnPartition(word, docId, partitionIndex);
-
-      partitionIndex.unlockIndexWriter();
-    }
+    indexWordOnPartition(word, docId, partitionIndex);
   }
 
   proc indexWordsOnPartition(requests: [] IndexRequest, requestCount: int, partition: int) {
     var partitionIndex = Indices[partition];
-    on partitionIndex {
-      partitionIndex.lockIndexWriter();
-
-      for i in 0..requestCount-1 {
-        indexWordOnPartition(requests[i].word, requests[i].docId, partitionIndex);
-      }
-
-      partitionIndex.unlockIndexWriter();
+    for i in 0..requestCount-1 {
+      indexWordOnPartition(requests[i].word, requests[i].docId, partitionIndex);
     }
   }
 
@@ -238,30 +210,26 @@ module Search {
   // }
 
   proc dumpEntry(entry: Entry) {
-    on entry {
-      info("word: ", entry.word, " score: ", entry.score);
-      var count = 0;
-      for docId in documentIdsForEntry(entry) {
-        writeln("\t", docId);
-        count += 1;
-      }
-      if (count != entry.documentCount.read()) {
-        error("ERROR: documentCount != count", count, entry.documentCount.read());
-      }
+    info("word: ", entry.word, " score: ", entry.score);
+    var count = 0;
+    for docId in documentIdsForEntry(entry) {
+      writeln("\t", docId);
+      count += 1;
+    }
+    if (count != entry.documentCount.read()) {
+      error("ERROR: documentCount != count", count, entry.documentCount.read());
     }
   }
 
   proc dumpPartition(partition: int) {
     var partitionIndex = Indices[partition];
-    on partitionIndex {
-      info("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
+    info("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
 
-      var word: string;
-      for i in 0..partitionIndex.entryCount.read()-1 {
-        var entry = partitionIndex.entries[i];
-        info("word: ", entry.word);
-        dumpPostingTableForWord(entry.word);
-      }
+    var word: string;
+    for i in 0..partitionIndex.entryCount.read()-1 {
+      var entry = partitionIndex.entries[i];
+      info("word: ", entry.word);
+      dumpPostingTableForWord(entry.word);
     }
   }
 
