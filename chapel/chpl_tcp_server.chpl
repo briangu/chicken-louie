@@ -76,7 +76,7 @@ proc initIndex() {
   t.stop();
   timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 
-  if () {
+  if (postTest) {
     dumpPostingTableForWord("the");
 
     // TODO: build execution Tree w/ conj / disj. (operator) nodes
