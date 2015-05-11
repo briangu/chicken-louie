@@ -28,7 +28,7 @@ export proc handle_received_data(fd: c_int, buffer: c_string, read: size_t, buff
   }
 //  writeln("trimmedWord: ", trimmedWord);
 	if (trimmedWord == "dump") {
-		dumpPartition(partitionForWord("dog"));
+		// dumpPartition(partitionForWord("dog"));
 	} else {
 		writeln("<adding>");
 	  indexWord(trimmedWord, 1);

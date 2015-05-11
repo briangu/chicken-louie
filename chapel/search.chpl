@@ -61,69 +61,62 @@ module Search {
   }
 
   class PartitionIndex {
-    var partition: int;
     var entryCount: atomic uint(32);
     var entryIndex = new LockFreeHash(entry_size);
     var entries: [1..entry_size] Entry;
 
     proc PartitionIndex() {
-      partition = 0;
-      entryCount.add(1); // start at the first index of entries
-    }
-
-    proc PartitionIndex(idx: int) {
-      partition = idx;
       entryCount.add(1); // start at the first index of entries
     }
   }
 
-  var Indices: [0..Partitions.size-1] PartitionIndex;
+  var rootPartition: PartitionIndex = new PartitionIndex();
 
   proc initIndices() {
-    var t: Timer;
-    t.start();
-    for i in 0..Partitions.size-1 {
-      info("index [", i, "] is mapped to partition ", i);
+    // var t: Timer;
+    // t.start();
+    // for i in 0..Partitions.size-1 {
+    //   info("index [", i, "] is mapped to partition ", i);
 
-      // allocate the partition index on the partition locale
-      Indices[i] = new PartitionIndex(i);
-    }
-    t.stop();
-    timing("initialized indices in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+    //   // allocate the partition index on the partition locale
+    //   Indices[i] = new PartitionIndex(i);
+    // }
+    // t.stop();
+    // timing("initialized indices in ",t.elapsed(TimeUnits.microseconds), " microseconds");
   }
 
   proc entryForWord(word: string): Entry {
-    var partition = partitionForWord(word);
-    var partitionIndex = Indices[partition];
-    var entry = entryForWordOnPartition(word, partitionIndex);
+    // var partition = partitionForWord(word);
+    // var partitionIndex = Indices[partition];
+    var entry = entryForWordOnPartition(word);
     return entry;
   }
 
-  proc entryForWordOnPartition(word: string, partitionIndex: PartitionIndex): Entry {
-    var entryIndex = entryIndexForWord(word, partitionIndex);
+  proc entryForWordOnPartition(word: string): Entry {
+    var entryIndex = entryIndexForWord(word);
     if (entryIndex > 0) {
-      return partitionIndex.entries[entryIndex];
+      return rootPartition.entries[entryIndex];
     }
     return nil;
   }
 
   proc indexWord(word: string, docId: DocId) {
-    var partition = partitionForWord(word);
-    var partitionIndex = Indices[partition];
-    indexWordOnPartition(word, docId, partitionIndex);
+    // var partition = partitionForWord(word);
+    // var partitionIndex = Indices[partition];
+    indexWordOnPartition(word, docId);
   }
 
   proc indexWordsOnPartition(requests: [] IndexRequest, requestCount: int, partition: int) {
-    var partitionIndex = Indices[partition];
     for i in 0..requestCount-1 {
-      indexWordOnPartition(requests[i].word, requests[i].docId, partitionIndex);
+      indexWordOnPartition(requests[i].word, requests[i].docId);
     }
   }
 
-  proc indexWordOnPartition(word, docId, partitionIndex: PartitionIndex) {
-    var entry = entryForWordOnPartition(word, partitionIndex);
+  proc indexWordOnPartition(word, docId) {
+    var partition = partitionForWord(word);
+    var entry = entryForWordOnPartition(word);
     if (entry != nil) {
-      debug("adding ", word, " to existing entries on partition ", partitionIndex.partition);
+      debug("adding ", word, " to existing entries on partition ", partition);
       var docNode = entry.documentIdNode;
       on docNode {
         var docCount = docNode.documentCount.read();
@@ -142,17 +135,17 @@ module Search {
       }
       entry.documentCount.add(1);
     } else {
-      debug("adding new entry ", word , " on partition ", partitionIndex.partition);
+      debug("adding new entry ", word , " on partition ", partition);
 
-      var entriesCount = partitionIndex.entryCount.read();
-      if (entriesCount < partitionIndex.entries.size) {
+      var entriesCount = rootPartition.entryCount.read();
+      if (entriesCount < rootPartition.entries.size) {
         entry = new Entry();
         entry.word = word;
         entry.score = 0;        
 
         var docNode: DocumentIdNode;
 
-        on Partitions[partitionIndex.partition] {
+        on Partitions[partition] {
           docNode = new DocumentIdNode();
           docNode.documents[docNode.documentIdIndex()] = docId;
           docNode.documentCount.write(1);
@@ -161,9 +154,9 @@ module Search {
         entry.documentIdNode = docNode;
         entry.documentCount.write(1);
 
-        var entryIndex: uint(32) = partitionIndex.entryCount.fetchAdd(1);
-        partitionIndex.entries[entryIndex] = entry;
-        var success = partitionIndex.entryIndex.setItem(word, entryIndex);
+        var entryIndex: uint(32) = rootPartition.entryCount.fetchAdd(1);
+        rootPartition.entries[entryIndex] = entry;
+        var success = rootPartition.entryIndex.setItem(word, entryIndex);
         if (!success) {
           error("indexWord: failed to index ", word);
           exit(0);
@@ -173,12 +166,12 @@ module Search {
     }
   }
 
-  proc indexContainsWord(word: string, partitionIndex: PartitionIndex): bool {
-    return entryIndexForWord(word, partitionIndex) != 0;
+  proc indexContainsWord(word: string): bool {
+    return entryIndexForWord(word) != 0;
   }
 
-  proc entryIndexForWord(word: string, partitionIndex: PartitionIndex): uint(32) {
-    return partitionIndex.entryIndex.getItem(word);
+  proc entryIndexForWord(word: string): uint(32) {
+    return rootPartition.entryIndex.getItem(word);
   }
 
   iter documentIdsForEntry(entry: Entry) {
@@ -209,17 +202,17 @@ module Search {
     }
   }
 
-  proc dumpPartition(partition: int) {
-    var partitionIndex = Indices[partition];
-    info("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
+  // proc dumpPartition(partition: int) {
+  //   var partitionIndex = Indices[partition];
+  //   info("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
 
-    var word: string;
-    for i in 0..partitionIndex.entryCount.read()-1 {
-      var entry = partitionIndex.entries[i];
-      info("word: ", entry.word);
-      dumpPostingTableForWord(entry.word);
-    }
-  }
+  //   var word: string;
+  //   for i in 0..partitionIndex.entryCount.read()-1 {
+  //     var entry = partitionIndex.entries[i];
+  //     info("word: ", entry.word);
+  //     dumpPostingTableForWord(entry.word);
+  //   }
+  // }
 
   proc dumpPostingTableForWord(word: string) {
     var entry = entryForWord(word);
