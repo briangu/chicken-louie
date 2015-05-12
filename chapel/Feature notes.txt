@@ -1,5 +1,15 @@
 Feature notes:
 
+export CHPL_TARGET_ARCH=native
+
+/home/ubuntu/src/chapel-1.11.0/runtime/etc/Makefile.comm-gasnet:19: /home/ubuntu/src/chapel-1.11.0/third-party/gasnet/install/linux32-gnu-native/seg-everything/nodbg/include/udp-conduit/udp-par.mak: No such file or directory
+make: *** No rule to make target `/home/ubuntu/src/chapel-1.11.0/third-party/gasnet/install/linux32-gnu-native/seg-everything/nodbg/include/udp-conduit/udp-par.mak'.  Stop.
+error: compiling generated source
+
+...
+
+--fast
+
 warning: --specialize was set, but CHPL_TARGET_ARCH is 'unknown'. If you want any specialization to occur please set CHPL_TARGET_ARCH to a proper value.
 
 ....
