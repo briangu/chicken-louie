@@ -1,4 +1,4 @@
-use Logging, Memory, IO, Partitions, Time;
+use GenHashKey64, Logging, Memory, IO, Partitions, Time;
 
 config const default_lfh_size: uint = 1024 * 64;
 config const max_doc_node_size = 1024 * 64;
@@ -34,7 +34,7 @@ class DocumentNode {
 
 record TableEntry {
   var hashKey: atomic uint;
-  var word: string;
+  var word: string; // HACK: the use of .word is buggy! just for a test until fixed
   var count: atomic int;
   var docNode: DocumentNode;
 }
@@ -45,9 +45,9 @@ class LockFreeHash {
   var array: [0..hashSize-1] TableEntry;
 
   proc addWord(word: string): bool {
-    var hashKey: uint = genHashKey32(word);
+    var hashKey: uint = genHashKey(word);
     var idx: uint = hashKey;
-    var count = 0;
+    var count: uint = 0;
     
     debug("word: ", word, " count: ", count);
 
@@ -58,6 +58,7 @@ class LockFreeHash {
 
       var probedKey = array[idx].hashKey.read();
       debug("probedKey: ", probedKey);
+      // HACK: the use of .word is buggy! just for a test until fixed
       if (probedKey != hashKey || array[idx].word != word) {
         // The entry was either free, or contains another key.
         if (probedKey != 0) {
@@ -94,7 +95,7 @@ class LockFreeHash {
   }
 
   proc getEntry(word: string, ref entry: TableEntry): bool {
-    var count = 0;
+    var count: uint = 0;
 
     debug("word: ", word, "count ", count);
 
