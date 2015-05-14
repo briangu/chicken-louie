@@ -31,11 +31,11 @@ module Search {
     var documents: [0..listSize-1] DocId;
 
     // number of documents in this node's list
-    var documentCount: atomic int;
+    var documentCount: int;
 
     // Gets the document id index to use to add a new document id.  documentCount should be incremented after using this index.
     proc documentIdIndex() {
-      return documents.size - documentCount.read() - 1;
+      return documents.size - documentCount - 1;
     }
 
     proc nextDocumentIdNodeSize() {
@@ -55,38 +55,37 @@ module Search {
     var score: real; // TODO: may not be needed if we use docCount as frequency
     
     // total number of documents in all the documentId nodes
-    var documentCount: atomic int;
+    var documentCount: int;
 
     var documentIdNode: DocumentIdNode;
   }
 
   class PartitionIndex {
     var partition: int;
-    var entryCount: atomic uint(32);
+    var entryCount: uint(32);
     var entryIndex = new LockFreeHash(entry_size);
     var entries: [1..entry_size] Entry;
-    var writerLock: atomicflag;
 
     inline proc lockIndexWriter() {
       // debug("attempting to get lock");
-      if (sync_writers) then while writerLock.testAndSet() do chpl_task_yield();
+      // if (sync_writers) then while writerLock.testAndSet() do chpl_task_yield();
       // debug("have lock");
     }
 
     inline proc unlockIndexWriter() {
       // writeln("releasing lock");
-      if (sync_writers) then writerLock.clear();
+      // if (sync_writers) then writerLock.clear();
       // writeln("released lock");
     }
 
     proc PartitionIndex() {
       partition = 0;
-      entryCount.add(1); // start at the first index of entries
+      entryCount += 1; // start at the first index of entries
     }
 
     proc PartitionIndex(idx: int) {
       partition = idx;
-      entryCount.add(1); // start at the first index of entries
+      entryCount += 1; // start at the first index of entries
     }
   }
 
@@ -128,18 +127,18 @@ module Search {
   proc indexWord(word: string, docId: DocId) {
     var partition = partitionForWord(word);
     var partitionIndex = Indices[partition];
-    on partitionIndex {
+    on partitionIndex { local {
       partitionIndex.lockIndexWriter();
 
       indexWordOnPartition(word, docId, partitionIndex);
 
       partitionIndex.unlockIndexWriter();
-    }
+    } }
   }
 
   proc indexWordsOnPartition(requests: [] IndexRequest, requestCount: int, partition: int) {
     var partitionIndex = Indices[partition];
-    on partitionIndex {
+    on partitionIndex { local {
       partitionIndex.lockIndexWriter();
 
       for i in 0..requestCount-1 {
@@ -147,7 +146,7 @@ module Search {
       }
 
       partitionIndex.unlockIndexWriter();
-    }
+    } }
   }
 
   proc indexWordOnPartition(word, docId, partitionIndex: PartitionIndex) {
@@ -155,22 +154,22 @@ module Search {
     if (entry != nil) {
       debug("adding ", word, " to existing entries on partition ", partitionIndex.partition);
       var docNode = entry.documentIdNode;
-      var docCount = docNode.documentCount.read();
+      var docCount = docNode.documentCount;
       if (docCount < docNode.documents.size) {
         docNode.documents[docNode.documentIdIndex()] = docId;
-        docNode.documentCount.add(1);
+        docNode.documentCount += 1;
       } else {
         docNode = new DocumentIdNode(docNode.nextDocumentIdNodeSize(), docNode);
         debug("adding new document id node of size ", docNode.documents.size);
         docNode.documents[docNode.documentIdIndex()] = docId;
-        docNode.documentCount.write(1);
+        docNode.documentCount = 1;
         entry.documentIdNode = docNode;
       }
-      entry.documentCount.add(1);
+      entry.documentCount += 1;
     } else {
       debug("adding new entry ", word , " on partition ", partitionIndex.partition);
 
-      var entriesCount = partitionIndex.entryCount.read();
+      var entriesCount = partitionIndex.entryCount;
       if (entriesCount < partitionIndex.entries.size) {
         entry = new Entry();
         entry.word = word;
@@ -178,11 +177,12 @@ module Search {
 
         var docNode = new DocumentIdNode();
         docNode.documents[docNode.documentIdIndex()] = docId;
-        docNode.documentCount.write(1);
+        docNode.documentCount = 1;
         entry.documentIdNode = docNode;
-        entry.documentCount.write(1);
+        entry.documentCount = 1;
 
-        var entryIndex: uint(32) = partitionIndex.entryCount.fetchAdd(1);
+        var entryIndex: uint(32) = partitionIndex.entryCount;
+        partitionIndex.entryCount += 1;
         partitionIndex.entries[entryIndex] = entry;
         var success = partitionIndex.entryIndex.setItem(word, entryIndex);
         if (!success) {
@@ -205,7 +205,7 @@ module Search {
   iter documentIdsForEntry(entry: Entry) {
     var node = entry.documentIdNode;
     while (node != nil) {
-      var startIdx = node.documents.size - node.documentCount.read();
+      var startIdx = node.documents.size - node.documentCount;
       for i in startIdx..node.documents.size-1 {
         var docId = node.documents[i];
         if (docId > 0) {
@@ -245,8 +245,8 @@ module Search {
         writeln("\t", docId);
         count += 1;
       }
-      if (count != entry.documentCount.read()) {
-        error("ERROR: documentCount != count", count, entry.documentCount.read());
+      if (count != entry.documentCount) {
+        error("ERROR: documentCount != count", count, entry.documentCount);
       }
     }
   }
@@ -257,7 +257,7 @@ module Search {
       info("entries on partition (", partition, ") locale (", here.id, ") ", partitionIndex.entries);
 
       var word: string;
-      for i in 0..partitionIndex.entryCount.read()-1 {
+      for i in 0..partitionIndex.entryCount-1 {
         var entry = partitionIndex.entries[i];
         info("word: ", entry.word);
         dumpPostingTableForWord(entry.word);
