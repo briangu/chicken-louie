@@ -1,6 +1,6 @@
 
 
-use Logging, Memory, LibEv, IO, Partitions, Time;
+use Logging, Memory, IO, Partitions, Time;
 
 class Node {
   var word: string;
