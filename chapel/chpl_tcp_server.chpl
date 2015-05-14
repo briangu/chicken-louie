@@ -8,7 +8,8 @@ extern var c_accept_cb: opaque;
 
 extern proc send(sockfd:c_int, buffer: c_string, len: size_t, flags: c_int);
 
-config var port: c_int = 3033;
+config const port: c_int = 3033;
+config const post_load_test: bool = false;
 
 // TODO: we need to know which client context this is so that we can maintain parsing context
 //       is the fd enough?
@@ -75,73 +76,72 @@ proc initIndex() {
 //   t.stop();
 //   timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 
-  dumpPostingTableForWord("the");
+  if (post_load_test) {
+    var t: Timer;
 
-  // TODO: build execution Tree w/ conj / disj. (operator) nodes
-  // test basic boolean operators
-  // writeln("conjunction");
-  // t.start();
-  // var conj = conjunction(["the", "dog"]);
-  // t.stop();
-  // timing("conjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
-  // writeln(conj);
+    dumpPostingTableForWord("the");
 
-  // writeln("disjunction");
-  // t.start();
-  // var disj = disjunction(["the", "dog"]);
-  // t.stop();
-  // timing("disjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
-  // writeln(disj);
+    // TODO: build execution Tree w/ conj / disj. (operator) nodes
+    // test basic boolean operators
+    writeln("conjunction");
+    t.start();
+    var conj = conjunction(["the", "dog"]);
+    t.stop();
+    timing("conjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+    writeln(conj);
+
+    writeln("disjunction");
+    t.start();
+    var disj = disjunction(["the", "dog"]);
+    t.stop();
+    timing("disjunction complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+    writeln(disj);
+  }
 }
 
+// SUPER SLOW
 proc conjunction(words: [] string): domain(DocId) {
   writeln("finding conjunction of: ", words);
-  var doms: [1..words.size] domain(DocId);
+  var doms: domain(DocId);
   
+  var t: Timer;
+
   for j in 1..words.size {
     var word = words[j];
-    var entry = entryForWord(word);
-    if (entry != nil) {
-      on entry {
-        for docId in documentIdsForEntry(entry) {
-          doms[j] += docId;
-        }
-      }
+    t.start();
+    var localdoms: domain(DocId) = documentIdsForWord(word);
+    t.stop();
+    timing("doc Ids for ", word," complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+
+    if (j > 1) {
+      t.start();
+      doms = doms & localdoms;
+      t.stop();
+      timing("& complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+    } else {
+      doms = localdoms;
     }
   }
 
-  writeln("applying intersection");
-
-  for j in 2..words.size {
-    doms[1] = doms[1] & doms[j];
-  }
-
-  return doms[1];
+  return doms;
 }
 
+// SUPER SLOW
 proc disjunction(words: [] string): domain(DocId) {
   writeln("finding disjunction of: ", words);
-  var doms: [1..words.size] domain(DocId);
+  var doms: domain(DocId);
   
   for j in 1..words.size {
     var word = words[j];
-    var entry = entryForWord(word);
-    if (entry != nil) {
-      on entry {
-        for docId in documentIdsForEntry(entry) {
-          doms[j] += docId;
-        }
-      }
+    var localdoms: domain(DocId) = documentIdsForWord(word);
+    if (j > 1) {
+      doms = doms | localdoms;
+    } else {
+      doms = localdoms;
     }
   }
 
-  writeln("applying disjunction");
-
-  for j in 2..words.size {
-    doms[1] = doms[1] | doms[j];
-  }
-
-  return doms[1];
+  return doms;
 }
 
 proc writeLocInfo(loc: locale) {

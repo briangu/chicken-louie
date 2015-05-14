@@ -303,6 +303,24 @@ module Search {
     return true;
   }
 
+  // SUPER SLOW
+  proc documentIdsForWord(word: string): domain(DocId) {
+    var dom: domain(DocId);
+    on Partitions[partitionForWord(word)] {
+      var entry: Entry;
+      var found = entryForWord(word, entry); 
+      if (found) {
+        var node = entry.documentIdNode;
+        while (node != nil) {
+          var startIdx = node.listSize - node.documentCount.read();
+          dom += node.documents[startIdx..node.listSize-1];
+          node = node.next;
+        }
+      }
+    }
+    return dom;
+  }
+
   iter documentIdsForEntry(entry: Entry) {
     var node = entry.documentIdNode;
     while (node != nil) {
