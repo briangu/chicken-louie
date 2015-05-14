@@ -10,17 +10,17 @@ all: chpl_tcp_server c_tcp_server chicken_ev
 tcp_server: tcp_server.o
 	$(CC) $(CFLAGS) -c -o tcp_server.o tcp_server.c
 
-chpl_tcp_server: tcp_server.o
-	chpl --devel --print-passes tcp_server.h tcp_server.o chapel/callbacks.h chapel/callbacks.c -I$(IDIR) -L$(LDIR) $(LIBS) -o chpl_tcp_server chapel/chpl_tcp_server.chpl
+search: tcp_server.o
+	chpl --devel --print-passes tcp_server.h tcp_server.o chapel/callbacks.h chapel/callbacks.c -I$(IDIR) -L$(LDIR) $(LIBS) -o search chapel/chpl_tcp_server.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl 
 
 crosstalk:
-	chpl --fast --print-passes -o crosstalk chapel/crosstalk.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
+	chpl --fast --print-passes -o crosstalk chapel/crosstalk.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
 
 crosstalk_hash:
-	chpl --fast --print-passes -o crosstalk_hash chapel/crosstalk_hash.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl 
+	chpl --fast --print-passes -o crosstalk_hash chapel/crosstalk_hash.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl 
 
 fanout:
-	chpl --fast --print-passes -o fanout chapel/fanout.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
+	chpl --fast --print-passes -o fanout chapel/fanout.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
 
 c_tcp_server: tcp_server.o
 	$(CC) $(CFLAGS) -L$(LDIR) $(LIBS) -o c_tcp_server tcp_server.c c/tcp_server_main.c
@@ -31,7 +31,7 @@ chicken_ev: tcp_server.o
 
 clean:
 	rm -f *.o
-	rm -f chpl_tcp_server
+	rm -f search 
 	rm -f c_tcp_server
 	rm -f chicken_ev
 	rm -f crosstalk

@@ -152,7 +152,7 @@ proc main() {
   var docId = 0;
   while (reader.readln(word)) {
     enqueueIndexRequest(new IndexRequest(word, docId));
-    docId = (docId + 1) % 1000; // fake doc ids
+    docId = (docId + 1) % 1000 + 1; // fake doc ids
   }
 
   t.stop();

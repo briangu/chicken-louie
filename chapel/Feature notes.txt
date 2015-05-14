@@ -1,5 +1,30 @@
 Feature notes:
 
+....
+
+  // can't yield inside on in 1.11.0
+  // 
+  // iter documentIdsForWord(word: string) {
+  //   var entry = entryForWord(word);
+  //   if (entry != nil) {
+  //     on entry {
+  //       var node = entry.documentIdNode;
+  //       while (node != nil) {
+  //         var startIdx = node.documents.size - node.documentCount.read();
+  //         for i in startIdx..node.documents.size-1 {
+  //           var docId = node.documents[i];
+  //           if (docId > 0) {
+  //             yield docId;
+  //           }
+  //         }
+  //         node = node.next;
+  //       }
+  //     }
+  //   }
+  // }
+
+...
+
 export CHPL_TARGET_ARCH=native
 
 /home/ubuntu/src/chapel-1.11.0/runtime/etc/Makefile.comm-gasnet:19: /home/ubuntu/src/chapel-1.11.0/third-party/gasnet/install/linux32-gnu-native/seg-everything/nodbg/include/udp-conduit/udp-par.mak: No such file or directory

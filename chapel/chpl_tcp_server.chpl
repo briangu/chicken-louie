@@ -44,7 +44,7 @@ proc initIndex() {
 
 
   initPartitions();
-  initIndices();
+  initIndicesFromDisk();
 
   // initIndexer();
 
@@ -58,25 +58,24 @@ proc initIndex() {
 
  //  writeln("dumping posting table for word: cat");
 	// dumpPostingTableForWord("cat");
-  var t: Timer;
-  t.start();
+//   var t: Timer;
+//   t.start();
 
-  var infile = open("words.txt", iomode.r);
-  var reader = infile.reader();
-  var word: string;
-  var docId: DocId = 1;
-  while (reader.readln(word)) {
-//    enqueueIndexRequest(word, docId);
-    indexWord(word, docId);
-    docId = (docId + 1) % 1000 + 1; // fake different docs
-  }
+//   var infile = open("words.txt", iomode.r);
+//   var reader = infile.reader();
+//   var word: string;
+//   var docId: DocId = 1;
+//   while (reader.readln(word)) {
+// //    enqueueIndexRequest(word, docId);
+//     indexWord(word, docId);
+//     docId = (docId + 1) % 1000 + 1; // fake different docs
+//   }
 
-//  waitForIndexer();
-  t.stop();
-  timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+// //  waitForIndexer();
+//   t.stop();
+//   timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 
-
-  //dumpPostingTableForWord("the");
+  dumpPostingTableForWord("the");
 
   // TODO: build execution Tree w/ conj / disj. (operator) nodes
   // test basic boolean operators
