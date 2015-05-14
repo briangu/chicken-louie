@@ -1,6 +1,6 @@
 use Logging, Memory, IO, Partitions, Time;
 
-config const default_lfh_size: uint(32) = 1024 * 64;
+config const default_lfh_size: uint = 1024 * 64;
 config const max_doc_node_size = 1024 * 64;
 
 type DocId = int(64);
@@ -33,20 +33,20 @@ class DocumentNode {
 }
 
 record TableEntry {
-  var hashKey: atomic uint(32);
+  var hashKey: atomic uint;
   var word: string;
   var count: atomic int;
   var docNode: DocumentNode;
 }
 
 class LockFreeHash {
-  var hashSize: uint(32) = 1024 * 64; // must be power of 2
+  var hashSize: uint = 1024 * 64; // must be power of 2
 
   var array: [0..hashSize-1] TableEntry;
 
   proc addWord(word: string): bool {
-    var hashKey: uint(32) = genHashKey32(word);
-    var idx: uint(32) = hashKey;
+    var hashKey: uint = genHashKey32(word);
+    var idx: uint = hashKey;
     var count = 0;
     
     debug("word: ", word, " count: ", count);
@@ -98,8 +98,8 @@ class LockFreeHash {
 
     debug("word: ", word, "count ", count);
 
-    var hashKey: uint(32) = genHashKey32(word);
-    var idx: uint(32) = hashKey;
+    var hashKey: uint = genHashKey(word);
+    var idx: uint = hashKey;
 
     while (count < array.size) {
       idx &= hashSize - 1;
