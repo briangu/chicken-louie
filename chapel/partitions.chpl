@@ -20,7 +20,7 @@ module Partitions {
     for i in 0..Partitions.size-1 {
       Partitions[i] = Locales[i % numLocales];
       on Partitions[i] {
-        info("partition[", i, "] is mapped to locale ", here.id);
+        info("partition[", i, "] is mapped to locale ", here.id, ' on ', Partitions[i].name);
       }
     }
     t.stop();
