@@ -8,7 +8,7 @@ proc main() {
 
   for partition in Partitions {
     on partition {
-      var infile = open("words" + here.id + ".txt", iomode.cwr);
+      var infile = open("/tmp/words" + here.id + ".txt", iomode.cwr);
       var writer = infile.writer();
       writer.writeln("I'm here at ", here.id);
     }
