@@ -13,6 +13,9 @@ tcp_server: tcp_server.o
 chpl_tcp_server: tcp_server.o
 	chpl --no-local --fast --print-passes tcp_server.h tcp_server.o chapel/callbacks.h chapel/callbacks.c -Mchapel -I$(IDIR) -L$(LDIR) $(LIBS) -o chpl_tcp_server chapel/chpl_tcp_server.chpl
 
+crosstalk:
+	chpl --no-local --print-passes -o crosstalk chapel/crosstalk.chpl 
+
 c_tcp_server: tcp_server.o
 	$(CC) $(CFLAGS) -L$(LDIR) $(LIBS) -o c_tcp_server tcp_server.c c/tcp_server_main.c
 
@@ -25,3 +28,4 @@ clean:
 	rm -f chpl_tcp_server
 	rm -f c_tcp_server
 	rm -f chicken_ev
+	rm -f crosstalk
