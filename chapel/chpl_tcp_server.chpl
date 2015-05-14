@@ -1,4 +1,4 @@
-use Logging, Memory, LibEv, IO, Indexer, Search, Partitions, Time;
+use Logging, Memory, LibEv, IO, Search, Partitions, Time;
 
 // TODO: port to pure chapel
 extern proc initialize_socket(port: c_int): c_int;
@@ -43,38 +43,8 @@ proc initIndex() {
 	writeln("It began running on locale #", here.id);
 	writeln();
 
-
   initPartitions();
   initIndicesFromDisk();
-
-  // initIndexer();
-
- //  writeln("adding 3 entries");
-	// indexWord("dog", 1);
-	// indexWord("cat", 2);
-	// indexWord("cat", 3);
-
- //  writeln("dumping partition holding word: dog");
-	// dumpPartition(partitionForWord("dog"));
-
- //  writeln("dumping posting table for word: cat");
-	// dumpPostingTableForWord("cat");
-//   var t: Timer;
-//   t.start();
-
-//   var infile = open("words.txt", iomode.r);
-//   var reader = infile.reader();
-//   var word: string;
-//   var docId: DocId = 1;
-//   while (reader.readln(word)) {
-// //    enqueueIndexRequest(word, docId);
-//     indexWord(word, docId);
-//     docId = (docId + 1) % 1000 + 1; // fake different docs
-//   }
-
-// //  waitForIndexer();
-//   t.stop();
-//   timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 
   if (post_load_test) {
     var t: Timer;
