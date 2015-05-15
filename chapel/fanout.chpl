@@ -2,6 +2,7 @@ use Common, Logging, IO, Partitions;
 
 config const buffersize = 1024;
 config const dir_prefix = "/ssd/words";
+config const use_partition_in_name: bool = false;
 
 class PartitionIndexer {
   var partition: int;
@@ -58,7 +59,12 @@ class PartitionIndexer {
   }
 
   proc consumer() {
-    var indexFile = open(dir_prefix + partition + ".txt", iomode.cwr);
+    var name: string = dir_prefix;
+    if (use_partition_in_name) {
+      name += partition;
+    }
+    name += ".txt";
+    var indexFile = open(name, iomode.cwr);
     var writer = indexFile.writer();
     for indexRequest in readFromBuff() {
       writer.writeln(indexRequest.word, "\t", indexRequest.docId);

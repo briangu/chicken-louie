@@ -5,6 +5,7 @@ module Search {
   use Logging, Common, Memory, GenHashKey64, Partitions, Time;
 
   config const dir_prefix = "/ssd/words";
+  config const use_partition_in_name: bool = false;
   config const entry_size: uint = 1024 * 64;
   config const max_doc_node_size: uint = 1024 * 32;
 
@@ -224,7 +225,12 @@ module Search {
         // allocate the partition index on the partition locale
         var partitionIndex = new PartitionIndex(partition);
   
-        var infile = open(dir_prefix + partition + ".txt", iomode.r);
+        var name: string = dir_prefix;
+        if (use_partition_in_name) {
+          name += partition;
+        }
+        name += ".txt";
+        var infile = open(name, iomode.r);
         var reader = infile.reader();
         var word: string;
         var docId: DocId;
