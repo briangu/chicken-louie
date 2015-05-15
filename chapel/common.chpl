@@ -7,5 +7,4 @@ module Common {
     var word: string;
     var docId: DocId;
   }
-
 }

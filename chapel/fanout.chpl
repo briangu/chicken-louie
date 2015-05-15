@@ -1,21 +1,13 @@
-use Logging, IO, Partitions;
+use Common, Logging, IO, Partitions;
 
 config const buffersize = 1024;
 config const dir_prefix = "/ssd/words";
-
-type DocId = int(64);
-
-class IndexRequest {
-  var word: string;
-  var docId: DocId;
-}
 
 class PartitionIndexer {
   var partition: int;
   var buff$: [0..buffersize-1] sync IndexRequest;
   var bufferIndex: atomic int;
   var release$: single bool;
-  var t: Timer;
 
   proc PartitionIndexer() {
     partition = 0;
@@ -149,7 +141,7 @@ proc main() {
   var infile = open("words.txt", iomode.r);
   var reader = infile.reader();
   var word: string;
-  var docId = 0;
+  var docId: DocId = 0;
   while (reader.readln(word)) {
     enqueueIndexRequest(new IndexRequest(word, docId));
     docId = (docId + 1) % 1000 + 1; // fake doc ids
