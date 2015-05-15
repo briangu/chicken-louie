@@ -283,7 +283,7 @@ GetSystemInfo(&info);
   return MAX(nprocs, MIN_CHILD_PROCESS_COUNT);
 }
 
-int startServer() {
+int start_server() {
   plog("master starting\n");
 
   g_master_pid = getpid();
