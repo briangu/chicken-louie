@@ -11,7 +11,7 @@ tcp_server: tcp_server.o
 	$(CC) $(CFLAGS) -c -o tcp_server.o tcp_server.c
 
 search: tcp_server.o
-	chpl --devel --print-passes tcp_server.h tcp_server.o chapel/callbacks.h chapel/callbacks.c -I$(IDIR) -L$(LDIR) $(LIBS) -o search chapel/chpl_tcp_server.chpl chapel/search.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl  chapel/libev.chpl
+	chpl --fast --print-passes tcp_server.h tcp_server.o chapel/callbacks.h chapel/callbacks.c -I$(IDIR) -L$(LDIR) $(LIBS) -o search chapel/chpl_tcp_server.chpl chapel/search.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl  chapel/libev.chpl
 
 crosstalk:
 	chpl --fast --print-passes -o crosstalk chapel/crosstalk.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
