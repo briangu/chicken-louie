@@ -20,7 +20,7 @@ crosstalk_hash:
 	chpl --fast --print-passes -o crosstalk_hash chapel/crosstalk_hash.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl 
 
 fanout:
-	chpl --fast --print-passes -o fanout chapel/fanout.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
+	chpl --print-passes -o fanout chapel/fanout.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
 
 c_tcp_server: tcp_server.o
 	$(CC) $(CFLAGS) -L$(LDIR) $(LIBS) -o c_tcp_server tcp_server.c c/tcp_server_main.c

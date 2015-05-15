@@ -64,6 +64,7 @@ class PartitionIndexer {
       name += partition;
     }
     name += ".txt";
+    info("opening ", name);
     var indexFile = open(name, iomode.cwr);
     var writer = indexFile.writer();
     for indexRequest in readFromBuff() {
