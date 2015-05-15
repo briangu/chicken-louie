@@ -10,6 +10,7 @@ extern proc send(sockfd:c_int, buffer: c_string, len: size_t, flags: c_int);
 
 config const port: c_int = 3033;
 config const post_load_test: bool = false;
+config const load_from_partitions: bool = true;
 
 // TODO: we need to know which client context this is so that we can maintain parsing context
 //       is the fd enough?
@@ -44,8 +45,30 @@ proc initIndex() {
 	writeln();
 
   initPartitions();
-  initIndicesFromDisk();
 
+  if (load_from_partitions) {
+    initIndicesFromPartitionDisks();
+  } else {
+    initIndices();
+
+    var t: Timer;
+    t.start();
+
+    var infile = open("words.txt", iomode.r);
+    var reader = infile.reader();
+    var word: string;
+    var docId: DocId = 1;
+    while (reader.readln(word)) {
+      indexWord(word, docId);
+      docId = (docId + 1) % 1000 + 1; // fake different docs
+    }
+
+  //  waitForIndexer();
+    t.stop();
+    timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
+  }
+
+  // engage in super slow but interesting test
   if (post_load_test) {
     var t: Timer;
 

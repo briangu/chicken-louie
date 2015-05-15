@@ -215,7 +215,7 @@ module Search {
     timing("initialized indices in ",t.elapsed(TimeUnits.microseconds), " microseconds");
   }
 
-  proc initIndicesFromDisk() {
+  proc initIndicesFromPartitionDisks() {
     var t: Timer;
     t.start();
     coforall partition in 0..Partitions.size-1 {
