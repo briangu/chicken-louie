@@ -1,4 +1,4 @@
-use Logging, Memory, LibEv, IO, Search, Partitions, Time;
+use Common, Logging, Memory, LibEv, IO, Search, Partitions, Time;
 
 // TODO: port to pure chapel
 extern proc initialize_socket(port: c_int): c_int;
