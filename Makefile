@@ -20,7 +20,7 @@ crosstalk_hash:
 	chpl --fast --print-passes -o crosstalk_hash chapel/crosstalk_hash.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl 
 
 crosstalk_replicated:
-	chpl --no-local --fast --print-passes -o crosstalk_replicated chapel/crosstalk_replicated.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
+	chpl --fast --print-passes -o crosstalk_replicated chapel/crosstalk_replicated.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
 
 fanout:
 	chpl --fast --print-passes -o fanout chapel/fanout.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl

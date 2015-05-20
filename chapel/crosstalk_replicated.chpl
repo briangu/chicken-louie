@@ -1,6 +1,6 @@
 use GenHashKey32, Logging, Memory, IO, ReplicatedDist, Time;
 
-type WordType = uint(32);
+type WordType = string; //uint(32);
 
 class Node {
   var word: WordType;
@@ -24,13 +24,6 @@ class PartitionInfo {
 //
 config const partitionDimensions = 16;
 
-/*
-const Dbase = {1..5};
-const Drepl: domain(1) dmapped ReplicatedDist() = Dbase;
-var Abase: [Dbase] int;
-var Arepl: [Drepl] int;
-*/
-
 // Partition to locale mapping.  Zero-based to allow modulo to work conveniently.
 const Space = {0..partitionDimensions-1};
 const ReplicatedSpace = Space dmapped ReplicatedDist();
@@ -40,31 +33,29 @@ proc initPartitions() {
   var t: Timer;
   t.start();
 
-  writeln("Partitions");
-  writeln(Space);
-  writeln(ReplicatedSpace);
-  writeln(Partitions);
-  writeln();
+  debug("Partitions");
+  debug(Space);
+  debug(ReplicatedSpace);
+  debug(Partitions);
 
-  // var tmpPartitions: [Space] PartitionInfo;
-  // for i in tmpPartitions.domain {
-  //   tmpPartitions[i] = new PartitionInfo();
-  // }
+  for loc in Locales {
+    on loc {
+      for i in Partitions.domain {
+        Partitions[i] = new PartitionInfo();
+      }
+    }
+  }
 
-  // // assign to the replicated Partitions array, causing a global replication of the array
-  // Partitions = tmpPartitions;
-
-  writeln("Partitions");
-  writeln(Partitions.size);
-  writeln(Partitions);
-  writeln();
+  debug("Partitions");
+  debug(Partitions.size);
+  debug(Partitions);
 
   t.stop();
   timing("initialized partitions in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 }
 
 inline proc partitionIdForWord(word: WordType): int {
-  return word % partitionDimensions;
+  return genHashKey32(word) % partitionDimensions;
 } 
 
 inline proc localeForWord(word: WordType): locale {
@@ -73,13 +64,18 @@ inline proc localeForWord(word: WordType): locale {
 
 // should be a local lookup
 inline proc partitionInfoForWord(word: WordType): PartitionInfo {
-  var info = Partitions[partitionIdForWord(word)];
-  if (info == nil) {
-    info = new PartitionInfo();
-    Partitions[partitionIdForWord(word)] = info;
-  }
-  return info;
+  return Partitions[partitionIdForWord(word)];
 }
+
+// override method to make it easy to switch WordType from string to uint(32)
+inline proc genHashKey32(x: uint(32)): uint(32) {
+  return x;
+}
+
+// override method to make it easy to switch WordType from string to uint(32)
+// inline proc indexWord(word: string) {
+//   indexWord(genHashKey32(word));
+// }
 
 proc indexWord(word: WordType) {
   // first move the locale that should have the word.  There may be more than one active partition on a single locale.
@@ -91,7 +87,7 @@ proc indexWord(word: WordType) {
       info.head = new Node(word, head);
       info.count.add(1);
     }
-    // writeln(Partitions);
+    debug(Partitions);
   }
 }
 
@@ -107,10 +103,10 @@ proc main() {
 
   // TODO: parallelize reads
   while (reader.readln(word)) {
-    indexWord(genHashKey32(word));
+    indexWord(word);
   }
 
-  writeln(Partitions);
+  debug(Partitions);
 
   t.stop();
   timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
