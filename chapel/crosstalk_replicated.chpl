@@ -93,8 +93,10 @@ proc indexWord(word: WordType) {
     // locally operate on the partition info that the word maps to
     local {
       var info = partitionInfoForWord(word);
+      var newNode = new Node(word); // do allocation outside of lock
       info.lockWriter();
-      info.head = new Node(word, info.head);
+      newNode.next = info.head;
+      info.head = newNode;
       info.unlockWriter();
       info.count.add(1);
       debug(Partitions);
