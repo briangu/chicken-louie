@@ -1,6 +1,6 @@
 use GenHashKey32, Logging, Memory, IO, ReplicatedDist, Time;
 
-type WordType = string; //uint(32);
+type WordType = uint(32);
 
 class Node {
   var word: WordType;
@@ -10,6 +10,16 @@ class Node {
 class PartitionInfo {
   var head: Node;
   var count: atomic int;
+
+  var writerLock: atomicflag;
+
+  inline proc lockWriter() {
+    while writerLock.testAndSet() do chpl_task_yield();
+  }
+
+  inline proc unlockWriter() {
+    writerLock.clear();
+  }
 }
 
 // Separate the search parition strategy from locales.
@@ -36,6 +46,7 @@ proc initPartitions() {
   debug("Partitions");
   debug(Space);
   debug(ReplicatedSpace);
+  debug(Partitions.size);
   debug(Partitions);
 
   for loc in Locales {
@@ -46,8 +57,7 @@ proc initPartitions() {
     }
   }
 
-  debug("Partitions");
-  debug(Partitions.size);
+  debug("Partitions [after init]");
   debug(Partitions);
 
   t.stop();
@@ -73,21 +83,22 @@ inline proc genHashKey32(x: uint(32)): uint(32) {
 }
 
 // override method to make it easy to switch WordType from string to uint(32)
-// inline proc indexWord(word: string) {
-//   indexWord(genHashKey32(word));
-// }
+inline proc indexWord(word: string) {
+  indexWord(genHashKey32(word));
+}
 
 proc indexWord(word: WordType) {
   // first move the locale that should have the word.  There may be more than one active partition on a single locale.
   on localeForWord(word) {
     // locally operate on the partition info that the word maps to
     local {
-      var info = partitionInfoForWord(word); // TODO: this should be already local w/o the local keyword
-      var head = info.head;
-      info.head = new Node(word, head);
+      var info = partitionInfoForWord(word);
+      info.lockWriter();
+      info.head = new Node(word, info.head);
+      info.unlockWriter();
       info.count.add(1);
+      debug(Partitions);
     }
-    debug(Partitions);
   }
 }
 
@@ -98,11 +109,8 @@ proc main() {
   t.start();
 
   var infile = open("words.txt", iomode.r);
-  var reader = infile.reader();
-  var word: string;
 
-  // TODO: parallelize reads
-  while (reader.readln(word)) {
+  coforall word in infile.lines() {
     indexWord(word);
   }
 
@@ -111,4 +119,3 @@ proc main() {
   t.stop();
   timing("indexing complete in ",t.elapsed(TimeUnits.microseconds), " microseconds");
 }
-
