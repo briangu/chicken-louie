@@ -5,39 +5,26 @@ CHICKEN_IDIR=/opt/local/Cellar/chicken/4.9.0.1/include/chicken
 CFLAGS=-I$(IDIR) -I.
 LIBS=-lev
 
-all: chpl_tcp_server c_tcp_server chicken_ev
+all: chearch 
 
 tcp_server: tcp_server.o
 	$(CC) $(CFLAGS) -c -o tcp_server.o tcp_server.c
 
-search: tcp_server.o
-	chpl --fast --print-passes tcp_server.h tcp_server.o chapel/callbacks.h chapel/callbacks.c -I$(IDIR) -L$(LDIR) $(LIBS) -o search chapel/chpl_tcp_server.chpl chapel/search.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl  chapel/libev.chpl
+chearch: tcp_server.o
+	chpl --fast --print-passes tcp_server.h tcp_server.o callbacks.h callbacks.c -I$(IDIR) -L$(LDIR) $(LIBS) -o bin/chearch chearch.chpl search.chpl common.chpl logging.chpl partitions.chpl genhashkey32.chpl genhashkey64.chpl  libev.chpl
 
 crosstalk:
-	chpl --fast --print-passes -o crosstalk chapel/crosstalk.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
+	chpl --fast --print-passes -o bin/crosstalk crosstalk.chpl common.chpl logging.chpl partitions.chpl genhashkey32.chpl
 
 crosstalk_hash:
-	chpl --fast --print-passes -o crosstalk_hash chapel/crosstalk_hash.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl chapel/genhashkey64.chpl 
+	chpl --fast --print-passes -o bin/crosstalk_hash crosstalk_hash.chpl common.chpl logging.chpl partitions.chpl genhashkey32.chpl genhashkey64.chpl 
 
 crosstalk_replicated:
-	chpl --fast --print-passes -o crosstalk_replicated chapel/crosstalk_replicated.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
+	chpl --fast --print-passes -o bin/crosstalk_replicated crosstalk_replicated.chpl common.chpl logging.chpl partitions.chpl genhashkey32.chpl
 
 fanout:
-	chpl --fast --print-passes -o fanout chapel/fanout.chpl chapel/common.chpl chapel/logging.chpl chapel/partitions.chpl chapel/genhashkey32.chpl
-
-c_tcp_server: tcp_server.o
-	$(CC) $(CFLAGS) -L$(LDIR) $(LIBS) -o c_tcp_server tcp_server.c c/tcp_server_main.c
-
-chicken_ev: tcp_server.o
-	$(CC) -I$(CHICKEN_IDIR) $(CFLAGS) -c chicken/callbacks.c
-	csc $(CFLAGS) -Ichicken -L$(LDIR) $(LIBS) -o chicken_ev callbacks.o chicken/libev.scm
+	chpl --fast --print-passes -o bin/fanout fanout.chpl common.chpl logging.chpl partitions.chpl genhashkey32.chpl
 
 clean:
 	rm -f *.o
-	rm -f search 
-	rm -f c_tcp_server
-	rm -f chicken_ev
-	rm -f crosstalk
-	rm -f crosstalk_hash
-	rm -f crosstalk_replicated
-	rm -f fanout
+	rm -f bin/*
